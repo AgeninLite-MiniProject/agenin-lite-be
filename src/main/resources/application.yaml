@@ -1,4 +1,4 @@
-  spring:
+spring:
   application:
     name: agenin-lite-be
   profiles:
