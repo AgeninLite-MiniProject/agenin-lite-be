@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ageninlite_db
+      POSTGRES_USER: agenin
+      POSTGRES_PASSWORD: agenin
+    ports:
+      - "5433:5432"
+    volumes:
+      - agenin_pgdata:/var/lib/postgresql/data
+volumes:
+  agenin_pgdata:
