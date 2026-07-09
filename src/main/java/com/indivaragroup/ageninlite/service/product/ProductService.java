@@ -59,6 +59,7 @@ public class ProductService {
 
         return ProductResponseDto.builder()
                 .product_id(updatedProduct.getProductId())
+                .product_name(updatedProduct.getProductName())
                 .product_status(updatedProduct.getProductStatus())
                 .message("Product updated successfully")
                 .build();
@@ -72,6 +73,9 @@ public class ProductService {
         productRepository.save(product);
 
         return ProductResponseDto.builder()
+                .product_id(product.getProductId())
+                .product_name(product.getProductName())
+                .product_status(product.getProductStatus())
                 .message("Product set to inactive successfully")
                 .build();
     }
