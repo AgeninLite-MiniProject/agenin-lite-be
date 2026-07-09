@@ -24,8 +24,10 @@ body:json {
 vars:pre-request {
   product_id: c34dc90e-565a-4473-ab75-b813036b033f
   base_url: http://localhost:8080
-  jwt_token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4MDIxNGZlMy1iODhiLTQ3NWItYThlOC1lOTAzYjRiMmQ2MDUiLCJwaG9uZSI6Iis2MjgwMDAwMDAwMDAxIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzgzNjE3MTU3LCJleHAiOjE3ODM2MTgwNTd9.DgmaDVFHSwMtaHiJqASuoxWauCnEUoQOKu0p3MbS7PgcYP3oKtXpZVqS2RemmzDexfAOSniTShozTU2vphDh4g
+  jwt_token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4MDIxNGZlMy1iODhiLTQ3NWItYThlOC1lOTAzYjRiMmQ2MDUiLCJwaG9uZSI6Iis2MjgwMDAwMDAwMDAxIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzgzNjE4OTAxLCJleHAiOjE3ODM2MTk4MDF9.vPMdYSEfSK-kJRyn5IbvFsmYi88NoXpJS17b0U7i--WQfB-qchCmeix1Vndi7HZT6mD_efjNCxY3YnbW4oSq-w
 }
+
+
 
 example {
   name: Update Product
@@ -52,7 +54,7 @@ example {
       x-frame-options: DENY
       content-type: application/json
       transfer-encoding: chunked
-      date: Thu, 09 Jul 2026 17:21:04 GMT
+      date: Thu, 09 Jul 2026 17:42:04 GMT
       keep-alive: timeout=60
       connection: keep-alive
     }
@@ -68,8 +70,8 @@ example {
         {
           "message": "Product updated successfully",
           "product_id": "c34dc90e-565a-4473-ab75-b813036b033f",
-          "product_name": null,
-          "product_status": "ACTIVE"
+          "product_name": "Paket Teh Jumbo",
+          "product_status": "INACTIVE"
         }
       '''
     }
