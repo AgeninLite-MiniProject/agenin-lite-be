@@ -1,0 +1,65 @@
+meta {
+  name: Get All Products
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/admin/products
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+vars:pre-request {
+  jwt_token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4MDIxNGZlMy1iODhiLTQ3NWItYThlOC1lOTAzYjRiMmQ2MDUiLCJwaG9uZSI6Iis2MjgwMDAwMDAwMDAxIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzgzNjE3MTU3LCJleHAiOjE3ODM2MTgwNTd9.DgmaDVFHSwMtaHiJqASuoxWauCnEUoQOKu0p3MbS7PgcYP3oKtXpZVqS2RemmzDexfAOSniTShozTU2vphDh4g
+  base_url: http://localhost:8080
+}
+
+example {
+  name: Get All Products
+  
+  request: {
+    url: {{base_url}}/api/admin/products
+    method: GET
+    mode: none
+  }
+  
+  response: {
+    headers: {
+      x-content-type-options: nosniff
+      x-xss-protection: 0
+      cache-control: no-cache, no-store, max-age=0, must-revalidate
+      pragma: no-cache
+      expires: 0
+      x-frame-options: DENY
+      content-type: application/json
+      transfer-encoding: chunked
+      date: Thu, 09 Jul 2026 17:13:44 GMT
+      keep-alive: timeout=60
+      connection: keep-alive
+    }
+  
+    status: {
+      code: 200
+      text: OK
+    }
+  
+    body: {
+      type: json
+      content: '''
+        [
+          {
+            "message": "Success",
+            "product_id": "6f46e05d-adef-498b-87b0-15fc73b09793",
+            "product_name": "Paket Susu Premium",
+            "product_status": "INACTIVE"
+          }
+        ]
+      '''
+    }
+  }
+}

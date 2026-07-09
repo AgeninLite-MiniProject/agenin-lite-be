@@ -1,0 +1,77 @@
+meta {
+  name: Update Product
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/api/admin/products/{{product_id}}/update
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+body:json {
+  {
+    "product_name": "Paket Teh Jumbo",
+    "selling_price": 6000.00
+  }
+}
+
+vars:pre-request {
+  product_id: c34dc90e-565a-4473-ab75-b813036b033f
+  base_url: http://localhost:8080
+  jwt_token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4MDIxNGZlMy1iODhiLTQ3NWItYThlOC1lOTAzYjRiMmQ2MDUiLCJwaG9uZSI6Iis2MjgwMDAwMDAwMDAxIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzgzNjE3MTU3LCJleHAiOjE3ODM2MTgwNTd9.DgmaDVFHSwMtaHiJqASuoxWauCnEUoQOKu0p3MbS7PgcYP3oKtXpZVqS2RemmzDexfAOSniTShozTU2vphDh4g
+}
+
+example {
+  name: Update Product
+  
+  request: {
+    url: {{base_url}}/api/admin/products/{{product_id}}/update
+    method: POST
+    mode: json
+    body:json: {
+      {
+        "product_name": "Paket Teh Jumbo",
+        "selling_price": 6000.00
+      }
+    }
+  }
+  
+  response: {
+    headers: {
+      x-content-type-options: nosniff
+      x-xss-protection: 0
+      cache-control: no-cache, no-store, max-age=0, must-revalidate
+      pragma: no-cache
+      expires: 0
+      x-frame-options: DENY
+      content-type: application/json
+      transfer-encoding: chunked
+      date: Thu, 09 Jul 2026 17:21:04 GMT
+      keep-alive: timeout=60
+      connection: keep-alive
+    }
+  
+    status: {
+      code: 200
+      text: OK
+    }
+  
+    body: {
+      type: json
+      content: '''
+        {
+          "message": "Product updated successfully",
+          "product_id": "c34dc90e-565a-4473-ab75-b813036b033f",
+          "product_name": null,
+          "product_status": "ACTIVE"
+        }
+      '''
+    }
+  }
+}
