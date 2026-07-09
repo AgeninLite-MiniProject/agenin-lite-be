@@ -86,6 +86,9 @@ class ProductServiceTest {
         assertEquals("Kopi ABC", mockProduct.getProductName());
         assertEquals(new BigDecimal("55000.00"), mockProduct.getSellingPrice());
         assertEquals("INACTIVE", mockProduct.getProductStatus());
+        assertEquals(productId, response.getProduct_id());
+        assertEquals("Kopi ABC", response.getProduct_name());
+        assertEquals("INACTIVE", response.getProduct_status());
     }
 
     @Test
@@ -99,6 +102,8 @@ class ProductServiceTest {
 
         assertNotNull(response);
         assertEquals("Teh Pucuk", mockProduct.getProductName());
+        assertEquals(productId, response.getProduct_id());
+        assertEquals("Teh Pucuk", response.getProduct_name());
     }
 
     @Test
@@ -124,6 +129,9 @@ class ProductServiceTest {
         assertNotNull(response);
         assertEquals("Product set to inactive successfully", response.getMessage());
         assertEquals("INACTIVE", mockProduct.getProductStatus());
+        assertEquals(productId, response.getProduct_id());
+        assertEquals("Teh Pucuk", response.getProduct_name());
+        assertEquals("INACTIVE", response.getProduct_status());
     }
 
     @Test
