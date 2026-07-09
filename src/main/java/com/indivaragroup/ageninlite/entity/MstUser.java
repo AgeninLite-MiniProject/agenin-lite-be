@@ -16,37 +16,48 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class MstUser {
+    
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "user_id")
     private UUID userId;
 
-    @Column(nullable = false, unique = true, length = 15)
+    @Column(name = "phone_number", nullable = false, unique = true, length = 20)
     private String phoneNumber;
 
-    @Column(nullable = false)
+    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    @Column(nullable = false, length = 100)
+    @Column(name = "user_name", nullable = false, length = 100)
     private String userName;
 
-    @Column(unique = true, length = 8)
-    private String referralCode;
+    @Column(name = "email", unique = true, length = 100)
+    private String email;
 
+    @Column(name = "referred_by")
     private UUID referredBy;
 
-    @Column(nullable = false, length = 10)
+    @Column(name = "referral_code", unique = true, length = 10)
+    private String referralCode;
+
+    @Column(name = "role", nullable = false, length = 20)
     private String role;
 
-    @Column(nullable = false, length = 10)
+    @Column(name = "user_status", nullable = false, length = 20)
     private String userStatus;
 
-    @Column(nullable = false)
+    @Builder.Default
+    @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted = false;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @CreationTimestamp
-    @Column(updatable = false)
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }

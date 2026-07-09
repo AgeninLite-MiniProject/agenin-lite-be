@@ -15,23 +15,28 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class AuthRefreshToken {
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID tokenId;
+    @Column(name = "refresh_token_id")
+    private UUID refreshTokenId;
 
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(nullable = false, unique = true)
-    private String token;
+    @Column(name = "token_id", nullable = false, unique = true, length = 64)
+    private String tokenId;
 
-    @Column(nullable = false)
+    @Column(name = "token_hash", nullable = false)
+    private String tokenHash;
+
+    @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
-    @Column(nullable = false)
-    private boolean isRevoked = false;
+    @Column(name = "revoked_at")
+    private LocalDateTime revokedAt;
 
     @CreationTimestamp
-    @Column(updatable = false)
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 }
