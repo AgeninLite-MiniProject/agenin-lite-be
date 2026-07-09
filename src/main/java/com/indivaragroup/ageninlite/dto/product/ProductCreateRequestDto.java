@@ -7,18 +7,18 @@ import java.math.BigDecimal;
 
 @Data
 public class ProductCreateRequestDto {
-    @NotBlank(message = "Product name is mandatory")
+    @NotBlank(message = "PRD_0003")
     private String product_name;
 
-    @NotNull(message = "Cost price is mandatory")
+    @NotNull(message = "PRD_0004")
     private BigDecimal cost_price;
 
-    @NotNull(message = "Selling price is mandatory")
+    @NotNull(message = "PRD_0005")
     private BigDecimal selling_price;
 
-    @NotNull(message = "Agent fee is mandatory")
+    @NotNull(message = "PRD_0006")
     private BigDecimal agent_fee;
 
-    @NotNull(message = "Super agent fee is mandatory")
+    @NotNull(message = "PRD_0007")
     private BigDecimal super_agent_fee;
 }
