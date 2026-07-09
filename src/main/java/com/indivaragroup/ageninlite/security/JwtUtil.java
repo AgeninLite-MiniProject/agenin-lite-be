@@ -19,7 +19,8 @@ public class JwtUtil {
     @Value("${JWT_SECRET}")
     private String jwtSecret;
 
-    private final int jwtExpirationMs = 86400000;
+    private final int jwtExpirationMs = 900000;
+    private final long refreshExpirationMs = 604800000L;
 
     private SecretKey getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
@@ -33,6 +34,16 @@ public class JwtUtil {
                 .claim("role", role)
                 .issuedAt(new Date())
                 .expiration(new Date((new Date().getTime()) + jwtExpirationMs))
+                .signWith((getSigningKey()))
+                .compact();
+    }
+
+    public String generateRefreshToken(UUID userId, String tokenId) {
+        return Jwts.builder()
+                .subject(userId.toString())
+                .claim("tokenId", tokenId)
+                .issuedAt(new Date())
+                .expiration(new Date((new Date().getTime()) + refreshExpirationMs))
                 .signWith((getSigningKey()))
                 .compact();
     }
