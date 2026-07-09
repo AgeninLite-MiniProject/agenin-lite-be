@@ -1,0 +1,9 @@
+version: 1
+
+secret:
+  ignored-paths:
+    - '**/test/**'
+    - '**/tests/**'
+    - '**/mock/**'
+    - '**/mocks/**'
+    - 'src/test/resources/application.properties'

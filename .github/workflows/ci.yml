@@ -1,0 +1,137 @@
+name: CI
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  push:
+    branches:
+      - main
+      - development
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+  pull_request:
+    branches:
+      - main
+      - development
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Backend: Maven + JaCoCo
+  # ─────────────────────────────────────────────
+  backend:
+    name: Backend Tests (Java 21)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: agenin_test
+          POSTGRES_USER: agenin
+          POSTGRES_PASSWORD: agenin_test_pw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agenin"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/agenin_test
+      SPRING_DATASOURCE_USERNAME: agenin
+      SPRING_DATASOURCE_PASSWORD: agenin_test_pw
+      JWT_SECRET: ci_test_secret_do_not_use_in_production_at_all
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - name: Run tests + generate JaCoCo report
+        run: ./mvnw verify -B
+
+      - name: Upload JaCoCo HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          retention-days: 14
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: target/site/jacoco/jacoco.xml
+          flags: backend
+          fail_ci_if_error: false
+
+      - name: JaCoCo coverage summary
+        if: always()
+        run: |
+          REPORT=target/site/jacoco/index.html
+          if [ ! -f "$REPORT" ]; then
+            echo "## Backend Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "No JaCoCo report generated." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          CSV=target/site/jacoco/jacoco.csv
+          if [ -f "$CSV" ]; then
+            INSTR_MISSED=$(awk -F',' 'NR>1{m+=$4}END{print m}' "$CSV")
+            INSTR_COVERED=$(awk -F',' 'NR>1{c+=$5}END{print c}' "$CSV")
+            INSTR_TOTAL=$((INSTR_MISSED + INSTR_COVERED))
+            PCT=$([ "$INSTR_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($INSTR_COVERED/$INSTR_TOTAL)*100}" || echo "N/A")
+            BRANCH_MISSED=$(awk -F',' 'NR>1{m+=$6}END{print m}' "$CSV")
+            BRANCH_COVERED=$(awk -F',' 'NR>1{c+=$7}END{print c}' "$CSV")
+            BRANCH_TOTAL=$((BRANCH_MISSED + BRANCH_COVERED))
+            BPCT=$([ "$BRANCH_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($BRANCH_COVERED/$BRANCH_TOTAL)*100}" || echo "N/A")
+          fi
+          {
+            echo "## Backend Coverage (JaCoCo)"
+            echo "| Metric | Covered | Missed | Total | % |"
+            echo "|--------|---------|--------|-------|---|"
+            echo "| Instructions | $INSTR_COVERED | $INSTR_MISSED | $INSTR_TOTAL | $PCT% |"
+            echo "| Branches | $BRANCH_COVERED | $BRANCH_MISSED | $BRANCH_TOTAL | $BPCT% |"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Post JaCoCo comment on PR
+        if: github.event_name == 'pull_request' && always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          CSV=target/site/jacoco/jacoco.csv
+          if [ ! -f "$CSV" ]; then
+            BODY="### Backend Coverage (JaCoCo)\nNo coverage report generated — tests may have failed."
+          else
+            INSTR_MISSED=$(awk -F',' 'NR>1{m+=$4}END{print m}' "$CSV")
+            INSTR_COVERED=$(awk -F',' 'NR>1{c+=$5}END{print c}' "$CSV")
+            INSTR_TOTAL=$((INSTR_MISSED + INSTR_COVERED))
+            PCT=$([ "$INSTR_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($INSTR_COVERED/$INSTR_TOTAL)*100}" || echo "N/A")
+            BRANCH_MISSED=$(awk -F',' 'NR>1{m+=$6}END{print m}' "$CSV")
+            BRANCH_COVERED=$(awk -F',' 'NR>1{c+=$7}END{print c}' "$CSV")
+            BRANCH_TOTAL=$((BRANCH_MISSED + BRANCH_COVERED))
+            BPCT=$([ "$BRANCH_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($BRANCH_COVERED/$BRANCH_TOTAL)*100}" || echo "N/A")
+            BODY="### Backend Coverage (JaCoCo)
+          | Metric | Covered | Missed | Total | % |
+          |--------|---------|--------|-------|---|
+          | Instructions | $INSTR_COVERED | $INSTR_MISSED | $INSTR_TOTAL | ${PCT}% |
+          | Branches | $BRANCH_COVERED | $BRANCH_MISSED | $BRANCH_TOTAL | ${BPCT}% |
+
+          Full report: [Download artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          fi
+          gh pr comment "$PR_NUMBER" --body "$BODY"
