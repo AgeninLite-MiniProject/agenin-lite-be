@@ -145,10 +145,6 @@ public class InvitationService {
         TrxInvitation invitation = invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)
                 .orElseThrow(() -> new AppException(InvitationErrorCode.INV_0014));
 
-        if (!invitation.getInviterId().equals(inviterId)) {
-            throw new AppException(InvitationErrorCode.INV_0015);
-        }
-
         if (!STATUS_PENDING.equals(invitation.getInvitationStatus())) {
             throw new AppException(InvitationErrorCode.INV_0011);
         }
