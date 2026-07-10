@@ -1,0 +1,25 @@
+meta {
+  name: Accept Invite
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/invitations/{{uuidA}}/accept
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI2Yzk0MzgxZi1kYjEzLTQwMmEtYWFiYy0wOTY3Y2JhYTM1NzgiLCJwaG9uZSI6Iis2MjgxMjMzMjIyNTQiLCJyb2xlIjoiQUdFTlQiLCJpYXQiOjE3ODM2NTE3NzgsImV4cCI6MTc4MzY1MjY3OH0.Esg01JbWw2eT45utgwU1YudnEZAm4pSrq4YQCLoA7R_92pk0sQj55X0DcIM0PPBriaSwt5_sruDqePmenI0L3A
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+  uuidA: aac5b7f1-26da-4b76-aff1-263e438e76be
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

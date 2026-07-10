@@ -1,0 +1,25 @@
+meta {
+  name: Decline Invite
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/invitations/{{uuidA}}/decline
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJkZGMzOGQ3My04YjNjLTRkYjctOWQ5YS05MTNmNGQyZDRlMTMiLCJwaG9uZSI6Iis2MjgxMjMzMzMzNTQiLCJyb2xlIjoiQUdFTlQiLCJpYXQiOjE3ODM2NTE5NTUsImV4cCI6MTc4MzY1Mjg1NX0.s3994K_TejOaB1pv8X5zuSLCsiB1kAYoSg1v05yP_u4aNYJ0Ks3F8D6C0hxsxolAZBBCMrTTEfS2LsBpqXyhcQ
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+  uuidA: aac5b7f1-26da-4b76-aff1-263e438e76be
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
