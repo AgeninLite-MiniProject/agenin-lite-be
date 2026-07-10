@@ -12,12 +12,16 @@ post {
 
 body:json {
   {
-    "name": "Siti Aminah",
-    "phone": "+6281234567892",
-    "email": "siti@mail.com",
+    "name": "John Doe",
+    "phone": "+628123666666",
+    "email": "john@mail.com",
     "password": "password321",
     "referralCode": ""
   }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
 }
 
 example {
@@ -29,9 +33,9 @@ example {
     mode: json
     body:json: {
       {
-        "name": "Siti Aminah",
-        "phone": "+6281234567892",
-        "email": "siti@mail.com",
+        "name": "Danu Aditya",
+        "phone": "+628123321454",
+        "email": "danu@mail.com",
         "password": "password321",
         "referralCode": ""
       }
