@@ -8,12 +8,14 @@ import com.indivaragroup.ageninlite.dto.product.ProductUpdateRequestDto;
 import com.indivaragroup.ageninlite.entity.MstProduct;
 import com.indivaragroup.ageninlite.repository.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductService {
@@ -22,6 +24,8 @@ public class ProductService {
 
     @Transactional
     public ProductResponseDto createProduct(ProductCreateRequestDto request) {
+        log.info("Process create product with name: {}", request.getProduct_name());
+
         MstProduct newProduct = MstProduct.builder()
                 .productName(request.getProduct_name())
                 .costPrice(request.getCost_price())
@@ -42,6 +46,8 @@ public class ProductService {
 
     @Transactional
     public ProductResponseDto updateProduct(UUID productId, ProductUpdateRequestDto request) {
+        log.info("Process update product with ID: {}", productId);
+
         MstProduct product = productRepository.findById(productId)
                 .orElseThrow(() -> new AppException(ProductErrorCode.PRD_0002));
 
@@ -66,6 +72,8 @@ public class ProductService {
     }
     @Transactional
     public ProductResponseDto setProductInactive(UUID productId) {
+        log.info("Process set inactive for product with ID: {}", productId);
+
         MstProduct product = productRepository.findById(productId)
                 .orElseThrow(() -> new AppException(ProductErrorCode.PRD_0002));
 
@@ -82,6 +90,8 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public List<ProductResponseDto> getAllProducts() {
+        log.info("Process get all products");
+
         return productRepository.findAll().stream()
                 .map(product -> ProductResponseDto.builder()
                         .product_id(product.getProductId())

@@ -3,6 +3,7 @@ package com.indivaragroup.ageninlite.common.exception;
 import com.indivaragroup.ageninlite.common.dto.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -29,6 +30,13 @@ public class GlobalExceptionHandler {
         ApiResponse<Void> response = new ApiResponse<>(false, ex.getMessage(), null);
 
         return new ResponseEntity<>(response,HttpStatus.BAD_REQUEST);
+    }
+
+    // handle authorization error (403 Forbidden)
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(AccessDeniedException ex) {
+        ApiResponse<Void> response = new ApiResponse<>(false, "AUTH_0020: Unauthorized — user is not an Admin", null);
+        return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
     }
 
     // handle app exception

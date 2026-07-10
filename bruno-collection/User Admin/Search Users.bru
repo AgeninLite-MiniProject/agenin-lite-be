@@ -1,13 +1,17 @@
 meta {
-  name: Get All Products
+  name: Search Users
   type: http
   seq: 1
 }
 
 get {
-  url: {{base_url}}/api/admin/products
+  url: {{base_url}}/api/admin/users?q=
   body: none
   auth: bearer
+}
+
+params:query {
+  q: 
 }
 
 auth:bearer {
@@ -20,12 +24,15 @@ vars:pre-request {
 }
 
 example {
-  name: Get All Products
+  name: Search Users
   
   request: {
-    url: {{base_url}}/api/admin/products
+    url: {{base_url}}/api/admin/users?q=
     method: GET
     mode: none
+    params:query: {
+      q: 
+    }
   }
   
   response: {
@@ -38,7 +45,7 @@ example {
       x-frame-options: DENY
       content-type: application/json
       transfer-encoding: chunked
-      date: Thu, 09 Jul 2026 17:13:44 GMT
+      date: Fri, 10 Jul 2026 06:17:08 GMT
       keep-alive: timeout=60
       connection: keep-alive
     }
@@ -53,10 +60,11 @@ example {
       content: '''
         [
           {
-            "message": "Success",
-            "product_id": "6f46e05d-adef-498b-87b0-15fc73b09793",
-            "product_name": "Paket Susu Premium",
-            "product_status": "INACTIVE"
+            "is_deleted": false,
+            "name": "Edi Wicoro",
+            "role": "AGENT",
+            "user_id": "55d5945b-0fba-4831-8a69-1607e9162067",
+            "user_status": "PASSIVE"
           }
         ]
       '''

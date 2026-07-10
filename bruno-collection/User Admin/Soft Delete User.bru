@@ -1,11 +1,11 @@
 meta {
-  name: Get All Products
+  name: Soft Delete User
   type: http
-  seq: 1
+  seq: 2
 }
 
-get {
-  url: {{base_url}}/api/admin/products
+post {
+  url: {{base_url}}/api/admin/users/55d5945b-0fba-4831-8a69-1607e9162067/delete
   body: none
   auth: bearer
 }
@@ -20,11 +20,11 @@ vars:pre-request {
 }
 
 example {
-  name: Get All Products
+  name: Soft Deleter User
   
   request: {
-    url: {{base_url}}/api/admin/products
-    method: GET
+    url: {{base_url}}/api/admin/users/55d5945b-0fba-4831-8a69-1607e9162067/delete
+    method: POST
     mode: none
   }
   
@@ -38,7 +38,7 @@ example {
       x-frame-options: DENY
       content-type: application/json
       transfer-encoding: chunked
-      date: Thu, 09 Jul 2026 17:13:44 GMT
+      date: Fri, 10 Jul 2026 06:19:51 GMT
       keep-alive: timeout=60
       connection: keep-alive
     }
@@ -51,14 +51,9 @@ example {
     body: {
       type: json
       content: '''
-        [
-          {
-            "message": "Success",
-            "product_id": "6f46e05d-adef-498b-87b0-15fc73b09793",
-            "product_name": "Paket Susu Premium",
-            "product_status": "INACTIVE"
-          }
-        ]
+        {
+          "message": "User soft-deleted successfully"
+        }
       '''
     }
   }
