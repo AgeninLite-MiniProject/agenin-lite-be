@@ -27,9 +27,6 @@ public enum InvitationErrorCode implements ErrorCode {
     // --- Decline Invitation Errors ---
     INV_0014("Invitation not found", HttpStatus.NOT_FOUND),                         // 404
 
-    // --- Cancel Invitation Errors ---
-    INV_0015("You are not the inviter of this invitation", HttpStatus.FORBIDDEN),    // 403
-
     // --- General Invitation Error ---
     INV_9999("Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR);            // 500
 
