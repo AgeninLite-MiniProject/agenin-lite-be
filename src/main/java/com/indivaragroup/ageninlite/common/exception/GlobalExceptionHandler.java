@@ -4,6 +4,8 @@ import com.indivaragroup.ageninlite.common.dto.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,7 +21,20 @@ public class GlobalExceptionHandler {
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
 
-        ApiResponse<Map<String, String>> response = new ApiResponse<>(false, "Validation Error", errors);
+        String trxCode = "TRX_0004";
+        for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
+            if (fe.getField().endsWith("quantity") && fe.getDefaultMessage() != null
+                    && fe.getDefaultMessage().contains("greater than 0")) {
+                trxCode = "TRX_0003";
+                break;
+            }
+        }
+
+        String message = trxCode + ": " + (trxCode.equals("TRX_0003")
+                ? "Quantity must be greater than 0"
+                : "Missing or invalid required field");
+
+        ApiResponse<Map<String, String>> response = new ApiResponse<>(false, message, errors);
 
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
