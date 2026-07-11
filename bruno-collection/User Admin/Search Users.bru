@@ -1,0 +1,84 @@
+meta {
+  name: Search Users
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/admin/users?q=&page=0&size=5
+  body: none
+  auth: bearer
+}
+
+params:query {
+  q: 
+  page: 0
+  size: 5
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+vars:pre-request {
+  jwt_token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4MDIxNGZlMy1iODhiLTQ3NWItYThlOC1lOTAzYjRiMmQ2MDUiLCJwaG9uZSI6Iis2MjgwMDAwMDAwMDAxIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzgzNzUzNzM4LCJleHAiOjE3ODM3NTQ2Mzh9.MoX06q6F1WS8ggeq_2Nt19VpAmiFPRGNWXhxzUqAE798ykxBdPL0YjJtcYHu8IBKnu-ZIZhXbfHDscHka_XHDQ
+  base_url: http://localhost:8080
+}
+
+example {
+  name: Search Users
+  
+  request: {
+    url: {{base_url}}/api/admin/users?q=&page=0&size=5
+    method: GET
+    mode: none
+    params:query: {
+      q: 
+      page: 0
+      size: 5
+    }
+  }
+  
+  response: {
+    headers: {
+      vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      x-content-type-options: nosniff
+      x-xss-protection: 0
+      cache-control: no-cache, no-store, max-age=0, must-revalidate
+      pragma: no-cache
+      expires: 0
+      x-frame-options: DENY
+      content-type: application/json
+      transfer-encoding: chunked
+      date: Sat, 11 Jul 2026 07:09:37 GMT
+      keep-alive: timeout=60
+      connection: keep-alive
+    }
+  
+    status: {
+      code: 200
+      text: OK
+    }
+  
+    body: {
+      type: json
+      content: '''
+        {
+          "content": [
+            {
+              "is_deleted": false,
+              "name": "John Doe",
+              "role": "AGENT",
+              "user_id": "9e38c7ca-7369-45d5-9e6b-1dd1b467ed97",
+              "user_status": "PASSIVE"
+            }
+          ],
+          "page": 0,
+          "size": 5,
+          "totalElements": 1,
+          "totalPages": 1
+        }
+      '''
+    }
+  }
+}

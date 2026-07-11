@@ -1,0 +1,60 @@
+meta {
+  name: Soft Delete User
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/admin/users/55d5945b-0fba-4831-8a69-1607e9162067/delete
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+vars:pre-request {
+  jwt_token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4MDIxNGZlMy1iODhiLTQ3NWItYThlOC1lOTAzYjRiMmQ2MDUiLCJwaG9uZSI6Iis2MjgwMDAwMDAwMDAxIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzgzNjY0MjA5LCJleHAiOjE3ODM2NjUxMDl9.hKMwdjUbKQSBvBO7i9wNzUDviXSDkW3kZC0lYayVnXMCV2nsijkk1N3TN4n32NkL66YjDREdMiUCDf2eT5NScg
+  base_url: http://localhost:8080
+}
+
+example {
+  name: Soft Deleter User
+  
+  request: {
+    url: {{base_url}}/api/admin/users/55d5945b-0fba-4831-8a69-1607e9162067/delete
+    method: POST
+    mode: none
+  }
+  
+  response: {
+    headers: {
+      x-content-type-options: nosniff
+      x-xss-protection: 0
+      cache-control: no-cache, no-store, max-age=0, must-revalidate
+      pragma: no-cache
+      expires: 0
+      x-frame-options: DENY
+      content-type: application/json
+      transfer-encoding: chunked
+      date: Fri, 10 Jul 2026 06:19:51 GMT
+      keep-alive: timeout=60
+      connection: keep-alive
+    }
+  
+    status: {
+      code: 200
+      text: OK
+    }
+  
+    body: {
+      type: json
+      content: '''
+        {
+          "message": "User soft-deleted successfully"
+        }
+      '''
+    }
+  }
+}

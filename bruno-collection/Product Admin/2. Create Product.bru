@@ -1,0 +1,82 @@
+meta {
+  name: Create Product
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/admin/products
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+body:json {
+  {
+    "product_name": "Paket Teh",
+    "cost_price": 3000.00,
+    "selling_price": 5000.00,
+    "agent_fee": 15.00,
+    "super_agent_fee": 5.00
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+  jwt_token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4MDIxNGZlMy1iODhiLTQ3NWItYThlOC1lOTAzYjRiMmQ2MDUiLCJwaG9uZSI6Iis2MjgwMDAwMDAwMDAxIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzgzNjE3MTU3LCJleHAiOjE3ODM2MTgwNTd9.DgmaDVFHSwMtaHiJqASuoxWauCnEUoQOKu0p3MbS7PgcYP3oKtXpZVqS2RemmzDexfAOSniTShozTU2vphDh4g
+}
+
+example {
+  name: Create Product
+  
+  request: {
+    url: {{base_url}}/api/admin/products
+    method: POST
+    mode: json
+    body:json: {
+      {
+        "product_name": "Paket Teh",
+        "cost_price": 3000.00,
+        "selling_price": 5000.00,
+        "agent_fee": 15.00,
+        "super_agent_fee": 5.00
+      }
+    }
+  }
+  
+  response: {
+    headers: {
+      x-content-type-options: nosniff
+      x-xss-protection: 0
+      cache-control: no-cache, no-store, max-age=0, must-revalidate
+      pragma: no-cache
+      expires: 0
+      x-frame-options: DENY
+      content-type: application/json
+      transfer-encoding: chunked
+      date: Thu, 09 Jul 2026 17:19:12 GMT
+      keep-alive: timeout=60
+      connection: keep-alive
+    }
+  
+    status: {
+      code: 201
+      text: Created
+    }
+  
+    body: {
+      type: json
+      content: '''
+        {
+          "message": "Product created successfully",
+          "product_id": "c34dc90e-565a-4473-ab75-b813036b033f",
+          "product_name": "Paket Teh",
+          "product_status": "ACTIVE"
+        }
+      '''
+    }
+  }
+}
