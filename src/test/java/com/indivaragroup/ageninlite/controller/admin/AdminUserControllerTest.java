@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.GlobalExceptionHandler;
 import com.indivaragroup.ageninlite.common.exception.code.UserErrorCode;
+import com.indivaragroup.ageninlite.common.dto.PaginatedResponseDto;
 import com.indivaragroup.ageninlite.dto.admin.UserDeleteResponseDto;
 import com.indivaragroup.ageninlite.dto.admin.UserSearchResponseDto;
 import com.indivaragroup.ageninlite.service.admin.AdminUserService;
@@ -69,13 +70,22 @@ class AdminUserControllerTest {
                 .is_deleted(false)
                 .build();
 
-        when(adminUserService.searchUsers(null)).thenReturn(List.of(user));
+        PaginatedResponseDto<UserSearchResponseDto> paginatedResponse = PaginatedResponseDto.<UserSearchResponseDto>builder()
+                .content(List.of(user))
+                .page(0)
+                .size(20)
+                .totalElements(1)
+                .totalPages(1)
+                .build();
+
+        when(adminUserService.searchUsers(null, 0, 20)).thenReturn(paginatedResponse);
 
         mockMvc.perform(get("/api/admin/users")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].user_id").value(targetUserId.toString()))
-                .andExpect(jsonPath("$[0].name").value("Test User"));
+                .andExpect(jsonPath("$.content[0].user_id").value(targetUserId.toString()))
+                .andExpect(jsonPath("$.content[0].name").value("Test User"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test
@@ -88,14 +98,23 @@ class AdminUserControllerTest {
                 .is_deleted(false)
                 .build();
 
-        when(adminUserService.searchUsers("Test")).thenReturn(List.of(user));
+        PaginatedResponseDto<UserSearchResponseDto> paginatedResponse = PaginatedResponseDto.<UserSearchResponseDto>builder()
+                .content(List.of(user))
+                .page(0)
+                .size(20)
+                .totalElements(1)
+                .totalPages(1)
+                .build();
+
+        when(adminUserService.searchUsers("Test", 0, 20)).thenReturn(paginatedResponse);
 
         mockMvc.perform(get("/api/admin/users")
                 .param("q", "Test")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].user_id").value(targetUserId.toString()))
-                .andExpect(jsonPath("$[0].name").value("Test User"));
+                .andExpect(jsonPath("$.content[0].user_id").value(targetUserId.toString()))
+                .andExpect(jsonPath("$.content[0].name").value("Test User"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test

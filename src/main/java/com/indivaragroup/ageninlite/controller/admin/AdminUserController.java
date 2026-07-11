@@ -1,5 +1,6 @@
 package com.indivaragroup.ageninlite.controller.admin;
 
+import com.indivaragroup.ageninlite.common.dto.PaginatedResponseDto;
 import com.indivaragroup.ageninlite.dto.admin.UserDeleteResponseDto;
 import com.indivaragroup.ageninlite.dto.admin.UserSearchResponseDto;
 import com.indivaragroup.ageninlite.service.admin.AdminUserService;
@@ -21,8 +22,15 @@ public class AdminUserController {
     private final AdminUserService adminUserService;
 
     @GetMapping
-    public ResponseEntity<List<UserSearchResponseDto>> searchUsers(@RequestParam(required = false) String q) {
-        return ResponseEntity.ok(adminUserService.searchUsers(q));
+    public ResponseEntity<PaginatedResponseDto<UserSearchResponseDto>> searchUsers(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        if (size > 100) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(adminUserService.searchUsers(q, page, size));
     }
 
     @PostMapping("/{userId}/delete")
