@@ -80,58 +80,48 @@ jobs:
           flags: backend
           fail_ci_if_error: false
 
-      - name: JaCoCo coverage summary
+      - name: Detailed JaCoCo Report
         if: always()
-        run: |
-          REPORT=target/site/jacoco/index.html
-          if [ ! -f "$REPORT" ]; then
-            echo "## Backend Coverage" >> $GITHUB_STEP_SUMMARY
-            echo "No JaCoCo report generated." >> $GITHUB_STEP_SUMMARY
-            exit 0
-          fi
-          CSV=target/site/jacoco/jacoco.csv
-          if [ -f "$CSV" ]; then
-            INSTR_MISSED=$(awk -F',' 'NR>1{m+=$4}END{print m}' "$CSV")
-            INSTR_COVERED=$(awk -F',' 'NR>1{c+=$5}END{print c}' "$CSV")
-            INSTR_TOTAL=$((INSTR_MISSED + INSTR_COVERED))
-            PCT=$([ "$INSTR_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($INSTR_COVERED/$INSTR_TOTAL)*100}" || echo "N/A")
-            BRANCH_MISSED=$(awk -F',' 'NR>1{m+=$6}END{print m}' "$CSV")
-            BRANCH_COVERED=$(awk -F',' 'NR>1{c+=$7}END{print c}' "$CSV")
-            BRANCH_TOTAL=$((BRANCH_MISSED + BRANCH_COVERED))
-            BPCT=$([ "$BRANCH_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($BRANCH_COVERED/$BRANCH_TOTAL)*100}" || echo "N/A")
-          fi
-          {
-            echo "## Backend Coverage (JaCoCo)"
-            echo "| Metric | Covered | Missed | Total | % |"
-            echo "|--------|---------|--------|-------|---|"
-            echo "| Instructions | $INSTR_COVERED | $INSTR_MISSED | $INSTR_TOTAL | $PCT% |"
-            echo "| Branches | $BRANCH_COVERED | $BRANCH_MISSED | $BRANCH_TOTAL | $BPCT% |"
-          } >> $GITHUB_STEP_SUMMARY
-
-      - name: Post JaCoCo comment on PR
-        if: github.event_name == 'pull_request' && always()
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          CSV=target/site/jacoco/jacoco.csv
-          if [ ! -f "$CSV" ]; then
-            BODY="### Backend Coverage (JaCoCo)\nNo coverage report generated — tests may have failed."
-          else
-            INSTR_MISSED=$(awk -F',' 'NR>1{m+=$4}END{print m}' "$CSV")
-            INSTR_COVERED=$(awk -F',' 'NR>1{c+=$5}END{print c}' "$CSV")
-            INSTR_TOTAL=$((INSTR_MISSED + INSTR_COVERED))
-            PCT=$([ "$INSTR_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($INSTR_COVERED/$INSTR_TOTAL)*100}" || echo "N/A")
-            BRANCH_MISSED=$(awk -F',' 'NR>1{m+=$6}END{print m}' "$CSV")
-            BRANCH_COVERED=$(awk -F',' 'NR>1{c+=$7}END{print c}' "$CSV")
-            BRANCH_TOTAL=$((BRANCH_MISSED + BRANCH_COVERED))
-            BPCT=$([ "$BRANCH_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($BRANCH_COVERED/$BRANCH_TOTAL)*100}" || echo "N/A")
-            BODY="### Backend Coverage (JaCoCo)
-          | Metric | Covered | Missed | Total | % |
-          |--------|---------|--------|-------|---|
-          | Instructions | $INSTR_COVERED | $INSTR_MISSED | $INSTR_TOTAL | ${PCT}% |
-          | Branches | $BRANCH_COVERED | $BRANCH_MISSED | $BRANCH_TOTAL | ${BPCT}% |
-
-          Full report: [Download artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          python3 -c "
+          import csv, os, sys
+          csv_file = 'target/site/jacoco/jacoco.csv'
+          if not os.path.exists(csv_file):
+              sys.exit(0)
+          packages = {}
+          with open(csv_file, 'r') as f:
+              reader = csv.DictReader(f)
+              for row in reader:
+                  pkg = row['PACKAGE']
+                  if not pkg: continue
+                  if pkg not in packages:
+                      packages[pkg] = {'im': 0, 'ic': 0, 'bm': 0, 'bc': 0}
+                  packages[pkg]['im'] += int(row['INSTRUCTION_MISSED'])
+                  packages[pkg]['ic'] += int(row['INSTRUCTION_COVERED'])
+                  packages[pkg]['bm'] += int(row['BRANCH_MISSED'])
+                  packages[pkg]['bc'] += int(row['BRANCH_COVERED'])
+          md = '### Backend Coverage Details (Per Package)\n\n'
+          md += '| Package | Instructions Cov | Branches Cov |\n'
+          md += '|---------|------------------|--------------|\n'
+          for pkg, stats in packages.items():
+              i_tot = stats['im'] + stats['ic']
+              i_pct = f\"{(stats['ic']/i_tot*100):.1f}%\" if i_tot > 0 else 'N/A'
+              b_tot = stats['bm'] + stats['bc']
+              b_pct = f\"{(stats['bc']/b_tot*100):.1f}%\" if b_tot > 0 else 'N/A'
+              md += f'| {pkg} | {i_pct} | {b_pct} |\n'
+          
+          summary_file = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary_file:
+              with open(summary_file, 'a') as f:
+                  f.write(md + '\n')
+                  
+          with open('pr_comment.md', 'w') as f:
+              f.write(md)
+          "
+          
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body-file pr_comment.md || true
           fi
-          gh pr comment "$PR_NUMBER" --body "$BODY"
+
