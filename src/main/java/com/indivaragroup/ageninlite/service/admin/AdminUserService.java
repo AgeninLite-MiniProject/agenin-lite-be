@@ -2,12 +2,16 @@ package com.indivaragroup.ageninlite.service.admin;
 
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.UserErrorCode;
+import com.indivaragroup.ageninlite.common.dto.PaginatedResponseDto;
 import com.indivaragroup.ageninlite.dto.admin.UserDeleteResponseDto;
 import com.indivaragroup.ageninlite.dto.admin.UserSearchResponseDto;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.repository.auth.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,24 +27,33 @@ public class AdminUserService {
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public List<UserSearchResponseDto> searchUsers(String query) {
-        log.info("Process search users with query: {}", query != null ? query : "ALL");
+    public PaginatedResponseDto<UserSearchResponseDto> searchUsers(String query, int page, int size) {
+        log.info("Process search users with query: {}, page: {}, size: {}", query != null ? query : "ALL", page, size);
 
-        List<MstUser> users;
+        Pageable pageable = PageRequest.of(page, size);
+        Page<MstUser> userPage;
 
         if (query != null && !query.trim().isEmpty()) {
-            users = userRepository.searchUsers(query);
+            userPage = userRepository.searchUsers(query, pageable);
         } else {
-            users = userRepository.findByIsDeletedFalseAndRole("AGENT");
+            userPage = userRepository.findByIsDeletedFalseAndRole("AGENT", pageable);
         }
 
-        return users.stream().map(user -> UserSearchResponseDto.builder()
+        List<UserSearchResponseDto> content = userPage.getContent().stream().map(user -> UserSearchResponseDto.builder()
                 .user_id(user.getUserId())
                 .name(user.getUserName())
                 .role(user.getRole())
                 .user_status(user.getUserStatus())
                 .is_deleted(user.isDeleted())
                 .build()).toList();
+
+        return PaginatedResponseDto.<UserSearchResponseDto>builder()
+                .content(content)
+                .page(userPage.getNumber())
+                .size(userPage.getSize())
+                .totalElements(userPage.getTotalElements())
+                .totalPages(userPage.getTotalPages())
+                .build();
     }
 
     @Transactional

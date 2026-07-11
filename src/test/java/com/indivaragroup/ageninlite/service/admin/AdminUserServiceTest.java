@@ -2,6 +2,7 @@ package com.indivaragroup.ageninlite.service.admin;
 
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.UserErrorCode;
+import com.indivaragroup.ageninlite.common.dto.PaginatedResponseDto;
 import com.indivaragroup.ageninlite.dto.admin.UserDeleteResponseDto;
 import com.indivaragroup.ageninlite.dto.admin.UserSearchResponseDto;
 import com.indivaragroup.ageninlite.entity.MstUser;
@@ -12,6 +13,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -50,37 +55,45 @@ class AdminUserServiceTest {
 
     @Test
     void searchUsers_WithNullQuery_ShouldReturnAllNonDeletedUsers() {
-        when(userRepository.findByIsDeletedFalseAndRole("AGENT")).thenReturn(List.of(targetUser));
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<MstUser> page = new PageImpl<>(List.of(targetUser), pageable, 1);
+        when(userRepository.findByIsDeletedFalseAndRole("AGENT", pageable)).thenReturn(page);
 
-        List<UserSearchResponseDto> result = adminUserService.searchUsers(null);
+        PaginatedResponseDto<UserSearchResponseDto> result = adminUserService.searchUsers(null, 0, 20);
 
-        assertEquals(1, result.size());
-        assertEquals("Target User", result.get(0).getName());
-        verify(userRepository).findByIsDeletedFalseAndRole("AGENT");
-        verify(userRepository, never()).searchUsers(anyString());
+        assertEquals(1, result.getContent().size());
+        assertEquals("Target User", result.getContent().get(0).getName());
+        assertEquals(1, result.getTotalElements());
+        assertEquals(1, result.getTotalPages());
+        verify(userRepository).findByIsDeletedFalseAndRole("AGENT", pageable);
+        verify(userRepository, never()).searchUsers(anyString(), any(Pageable.class));
     }
 
     @Test
     void searchUsers_WithEmptyQuery_ShouldReturnAllNonDeletedUsers() {
-        when(userRepository.findByIsDeletedFalseAndRole("AGENT")).thenReturn(List.of(targetUser));
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<MstUser> page = new PageImpl<>(List.of(targetUser), pageable, 1);
+        when(userRepository.findByIsDeletedFalseAndRole("AGENT", pageable)).thenReturn(page);
 
-        List<UserSearchResponseDto> result = adminUserService.searchUsers("   ");
+        PaginatedResponseDto<UserSearchResponseDto> result = adminUserService.searchUsers("   ", 0, 20);
 
-        assertEquals(1, result.size());
-        verify(userRepository).findByIsDeletedFalseAndRole("AGENT");
-        verify(userRepository, never()).searchUsers(anyString());
+        assertEquals(1, result.getContent().size());
+        verify(userRepository).findByIsDeletedFalseAndRole("AGENT", pageable);
+        verify(userRepository, never()).searchUsers(anyString(), any(Pageable.class));
     }
 
     @Test
     void searchUsers_WithValidQuery_ShouldReturnMatchingUsers() {
-        when(userRepository.searchUsers("Target")).thenReturn(List.of(targetUser));
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<MstUser> page = new PageImpl<>(List.of(targetUser), pageable, 1);
+        when(userRepository.searchUsers("Target", pageable)).thenReturn(page);
 
-        List<UserSearchResponseDto> result = adminUserService.searchUsers("Target");
+        PaginatedResponseDto<UserSearchResponseDto> result = adminUserService.searchUsers("Target", 0, 20);
 
-        assertEquals(1, result.size());
-        assertEquals("Target User", result.get(0).getName());
-        verify(userRepository).searchUsers("Target");
-        verify(userRepository, never()).findByIsDeletedFalseAndRole(anyString());
+        assertEquals(1, result.getContent().size());
+        assertEquals("Target User", result.getContent().get(0).getName());
+        verify(userRepository).searchUsers("Target", pageable);
+        verify(userRepository, never()).findByIsDeletedFalseAndRole(anyString(), any(Pageable.class));
     }
 
     @Test
