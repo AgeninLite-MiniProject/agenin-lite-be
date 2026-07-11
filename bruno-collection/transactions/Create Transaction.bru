@@ -1,0 +1,40 @@
+meta {
+  name: Create Transaction
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/transactions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJkZjg2Y2JkYy1kZmYxLTQxNWEtOGFmZS03NzdiZGZkNjU5NjAiLCJwaG9uZSI6Iis2MjgxMjM2NjY2NjYiLCJyb2xlIjoiQUdFTlQiLCJpYXQiOjE3ODM3ODAyODYsImV4cCI6MTc4Mzc4MTE4Nn0.l4qZRlgRIBKUfAP4NGJGkMNjF3dHaSJcSVA5GtcNuyH7ilcfqbO774dclZNzMmnbhXcvAfmHgQVb7dd_UrLOyg
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "productId": "<active-product-uuid-1>",
+        "quantity": 2
+      },
+      {
+        "productId": "<active-product-uuid-2>",
+        "quantity": 3
+      }
+    ],
+    "description": "Warung Pak Haji"
+  }
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

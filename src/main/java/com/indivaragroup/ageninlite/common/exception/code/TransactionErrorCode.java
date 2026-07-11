@@ -15,6 +15,12 @@ public enum TransactionErrorCode implements ErrorCode {
     TRX_0005("Duplicate product in request", HttpStatus.BAD_REQUEST), // 400
     TRX_0006("Quantity exceeds maximum allowed", HttpStatus.BAD_REQUEST), // 400
 
+    // === Complete Transaction (TRX_0010 - TRX_0013) ===
+    TRX_0010("Transaction not found",                       HttpStatus.NOT_FOUND),  // 404
+    TRX_0011("Transaction is not in PENDING status",        HttpStatus.BAD_REQUEST), // 400
+    TRX_0012("You can only complete your own transactions", HttpStatus.FORBIDDEN),   // 403
+    TRX_0013("Product is no longer active",                 HttpStatus.BAD_REQUEST), // 400
+
     // === Catch-all ===
     TRX_9999("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR); // 500
 
