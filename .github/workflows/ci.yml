@@ -82,11 +82,35 @@ jobs:
 
       - name: Detailed JaCoCo Report
         if: always()
-        uses: Madrapps/jacoco-report@v1.8
-        with:
-          paths: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
-          token: ${{ secrets.GITHUB_TOKEN }}
-          min-coverage-overall: 100
-          min-coverage-changed-files: 100
-          title: "Backend Coverage Details"
-          update-comment: true
+        run: |
+          python3 -c "
+          import csv, os, sys
+          csv_file = 'target/site/jacoco/jacoco.csv'
+          if not os.path.exists(csv_file):
+              sys.exit(0)
+          packages = {}
+          with open(csv_file, 'r') as f:
+              reader = csv.DictReader(f)
+              for row in reader:
+                  pkg = row['PACKAGE']
+                  if not pkg: continue
+                  if pkg not in packages:
+                      packages[pkg] = {'im': 0, 'ic': 0, 'bm': 0, 'bc': 0}
+                  packages[pkg]['im'] += int(row['INSTRUCTION_MISSED'])
+                  packages[pkg]['ic'] += int(row['INSTRUCTION_COVERED'])
+                  packages[pkg]['bm'] += int(row['BRANCH_MISSED'])
+                  packages[pkg]['bc'] += int(row['BRANCH_COVERED'])
+          md = '### Backend Coverage Details (Per Package)\n\n'
+          md += '| Package | Instructions Cov | Branches Cov |\n'
+          md += '|---------|------------------|--------------|\n'
+          for pkg, stats in packages.items():
+              i_tot = stats['im'] + stats['ic']
+              i_pct = f\"{(stats['ic']/i_tot*100):.1f}%\" if i_tot > 0 else 'N/A'
+              b_tot = stats['bm'] + stats['bc']
+              b_pct = f\"{(stats['bc']/b_tot*100):.1f}%\" if b_tot > 0 else 'N/A'
+              md += f'| `{pkg}` | {i_pct} | {b_pct} |\n'
+          summary_file = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary_file:
+              with open(summary_file, 'a') as f:
+                  f.write(md + '\n')
+          "
