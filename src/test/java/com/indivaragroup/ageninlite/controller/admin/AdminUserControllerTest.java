@@ -118,6 +118,14 @@ class AdminUserControllerTest {
     }
 
     @Test
+    void searchUsers_WithSizeGreaterThan100_ShouldReturnBadRequest() throws Exception {
+        mockMvc.perform(get("/api/admin/users")
+                .param("size", "101")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void deleteUser_Success() throws Exception {
         UserDeleteResponseDto responseDto = UserDeleteResponseDto.builder()
                 .message("User soft-deleted successfully")
