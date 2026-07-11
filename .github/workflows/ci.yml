@@ -82,7 +82,7 @@ jobs:
 
       - name: Detailed JaCoCo Report
         if: always()
-        uses: Madrapps/jacoco-report@v1.6.2
+        uses: Madrapps/jacoco-report@v1.8
         with:
           paths: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
           token: ${{ secrets.GITHUB_TOKEN }}
