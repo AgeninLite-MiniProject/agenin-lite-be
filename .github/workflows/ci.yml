@@ -80,58 +80,13 @@ jobs:
           flags: backend
           fail_ci_if_error: false
 
-      - name: JaCoCo coverage summary
+      - name: Detailed JaCoCo Report
         if: always()
-        run: |
-          REPORT=target/site/jacoco/index.html
-          if [ ! -f "$REPORT" ]; then
-            echo "## Backend Coverage" >> $GITHUB_STEP_SUMMARY
-            echo "No JaCoCo report generated." >> $GITHUB_STEP_SUMMARY
-            exit 0
-          fi
-          CSV=target/site/jacoco/jacoco.csv
-          if [ -f "$CSV" ]; then
-            INSTR_MISSED=$(awk -F',' 'NR>1{m+=$4}END{print m}' "$CSV")
-            INSTR_COVERED=$(awk -F',' 'NR>1{c+=$5}END{print c}' "$CSV")
-            INSTR_TOTAL=$((INSTR_MISSED + INSTR_COVERED))
-            PCT=$([ "$INSTR_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($INSTR_COVERED/$INSTR_TOTAL)*100}" || echo "N/A")
-            BRANCH_MISSED=$(awk -F',' 'NR>1{m+=$6}END{print m}' "$CSV")
-            BRANCH_COVERED=$(awk -F',' 'NR>1{c+=$7}END{print c}' "$CSV")
-            BRANCH_TOTAL=$((BRANCH_MISSED + BRANCH_COVERED))
-            BPCT=$([ "$BRANCH_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($BRANCH_COVERED/$BRANCH_TOTAL)*100}" || echo "N/A")
-          fi
-          {
-            echo "## Backend Coverage (JaCoCo)"
-            echo "| Metric | Covered | Missed | Total | % |"
-            echo "|--------|---------|--------|-------|---|"
-            echo "| Instructions | $INSTR_COVERED | $INSTR_MISSED | $INSTR_TOTAL | $PCT% |"
-            echo "| Branches | $BRANCH_COVERED | $BRANCH_MISSED | $BRANCH_TOTAL | $BPCT% |"
-          } >> $GITHUB_STEP_SUMMARY
-
-      - name: Post JaCoCo comment on PR
-        if: github.event_name == 'pull_request' && always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          CSV=target/site/jacoco/jacoco.csv
-          if [ ! -f "$CSV" ]; then
-            BODY="### Backend Coverage (JaCoCo)\nNo coverage report generated — tests may have failed."
-          else
-            INSTR_MISSED=$(awk -F',' 'NR>1{m+=$4}END{print m}' "$CSV")
-            INSTR_COVERED=$(awk -F',' 'NR>1{c+=$5}END{print c}' "$CSV")
-            INSTR_TOTAL=$((INSTR_MISSED + INSTR_COVERED))
-            PCT=$([ "$INSTR_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($INSTR_COVERED/$INSTR_TOTAL)*100}" || echo "N/A")
-            BRANCH_MISSED=$(awk -F',' 'NR>1{m+=$6}END{print m}' "$CSV")
-            BRANCH_COVERED=$(awk -F',' 'NR>1{c+=$7}END{print c}' "$CSV")
-            BRANCH_TOTAL=$((BRANCH_MISSED + BRANCH_COVERED))
-            BPCT=$([ "$BRANCH_TOTAL" -gt 0 ] && awk "BEGIN{printf \"%.1f\", ($BRANCH_COVERED/$BRANCH_TOTAL)*100}" || echo "N/A")
-            BODY="### Backend Coverage (JaCoCo)
-          | Metric | Covered | Missed | Total | % |
-          |--------|---------|--------|-------|---|
-          | Instructions | $INSTR_COVERED | $INSTR_MISSED | $INSTR_TOTAL | ${PCT}% |
-          | Branches | $BRANCH_COVERED | $BRANCH_MISSED | $BRANCH_TOTAL | ${BPCT}% |
-
-          Full report: [Download artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          fi
-          gh pr comment "$PR_NUMBER" --body "$BODY"
+        uses: Madrapps/jacoco-report@v1.6.2
+        with:
+          paths: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 100
+          min-coverage-changed-files: 100
+          title: "Backend Coverage Details"
+          update-comment: true
