@@ -36,7 +36,7 @@ public class AdminUserService {
         if (query != null && !query.trim().isEmpty()) {
             userPage = userRepository.searchUsers(query, pageable);
         } else {
-            userPage = userRepository.findByIsDeletedFalseAndRole("AGENT", pageable);
+            userPage = userRepository.findByRole("AGENT", pageable);
         }
 
         List<UserSearchResponseDto> content = userPage.getContent().stream().map(user -> UserSearchResponseDto.builder()
