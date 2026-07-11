@@ -55,6 +55,15 @@ public class ProductService {
         if (request.getSelling_price() != null) {
             product.setSellingPrice(request.getSelling_price());
         }
+        if (request.getCost_price() != null) {
+            product.setCostPrice(request.getCost_price());
+        }
+        if (request.getAgent_fee() != null) {
+            product.setAgentFee(request.getAgent_fee());
+        }
+        if (request.getSuper_agent_fee() != null) {
+            product.setSuperAgentFee(request.getSuper_agent_fee());
+        }
         if (request.getProduct_status() != null) {
             product.setProductStatus(request.getProduct_status());
         }
