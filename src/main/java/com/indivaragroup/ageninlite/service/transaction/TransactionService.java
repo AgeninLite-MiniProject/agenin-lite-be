@@ -43,7 +43,7 @@ public class TransactionService {
     private final UserRepository userRepository;
 
     @Transactional
-    public CompleteTransactionResponse complete(UUID requesterId, UUID trxId) {
+    public CompleteTransactionResponse completeTransaction(UUID requesterId, UUID trxId) {
 
         //find transaction by id
         TrxTransaction trx = trxTransactionRepository.findById(trxId)
@@ -78,7 +78,7 @@ public class TransactionService {
         //check each item product if its actually there and if its active
         for (TrxItem item : items) {
             MstProduct product = productById.get(item.getProductId());
-            if (product == null || !"ACTIVE".equals(product.getProductStatus())) {
+            if (product == null || !USER_STATUS_ACTIVE.equals(product.getProductStatus())) {
                 throw new AppException(TransactionErrorCode.TRX_0013);
             }
         }
@@ -177,9 +177,7 @@ public class TransactionService {
                 .transactionId(savedTrx.getTrxId())
                 .trxStatus(savedTrx.getTrxStatus())
                 .completedAt(savedTrx.getCompletedAt())
-                .productName(productById.get(items.get(0).getProductId()) != null
-                        ? productById.get(items.get(0).getProductId()).getProductName()
-                        : null)
+                .productName(productById.get(items.getFirst().getProductId()).getProductName())
                 .amount(savedTrx.getTotalAmount())
                 .profit(savedTrx.getTotalProfit())
                 .commissionsCreated(totalRowsCreated)
@@ -199,7 +197,7 @@ public class TransactionService {
         return USER_STATUS_PASSIVE.equals(seller.getUserStatus());
     }
 
-    public CreateTransactionResponse create(UUID sellerId, CreateTransactionRequest request) {
+    public CreateTransactionResponse createTransaction(UUID sellerId, CreateTransactionRequest request) {
 
         // === Step 2: duplicate productId check (Set-based; rejects, doesn't sum) ===
         Set<UUID> seenProductIds = new HashSet<>();

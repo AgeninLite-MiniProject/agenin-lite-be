@@ -31,7 +31,7 @@ public class TransactionController {
             @Valid @RequestBody CreateTransactionRequest request){
         UUID sellerUuid = UUID.fromString(sellerId);
 
-        CreateTransactionResponse response = transactionService.create(sellerUuid, request);
+        CreateTransactionResponse response = transactionService.createTransaction(sellerUuid, request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(new ApiResponse<>(true, "Transaction created", response));
@@ -43,7 +43,7 @@ public class TransactionController {
             @PathVariable UUID id) {
 
         UUID requesterUuid = UUID.fromString(requesterId);
-        CompleteTransactionResponse response = transactionService.complete(requesterUuid, id);
+        CompleteTransactionResponse response = transactionService.completeTransaction(requesterUuid, id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Transaction completed", response));
     }
 }
