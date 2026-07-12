@@ -1,0 +1,84 @@
+meta {
+  name: Register User
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "John Doe",
+    "phone": "+628123666666",
+    "email": "john@mail.com",
+    "password": "password321",
+    "referralCode": ""
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+}
+
+example {
+  name: Register User
+  
+  request: {
+    url: {{base_url}}/api/auth/register
+    method: POST
+    mode: json
+    body:json: {
+      {
+        "name": "Danu Aditya",
+        "phone": "+628123321454",
+        "email": "danu@mail.com",
+        "password": "password321",
+        "referralCode": ""
+      }
+    }
+  }
+  
+  response: {
+    headers: {
+      x-content-type-options: nosniff
+      x-xss-protection: 0
+      cache-control: no-cache, no-store, max-age=0, must-revalidate
+      pragma: no-cache
+      expires: 0
+      x-frame-options: DENY
+      content-type: application/json
+      transfer-encoding: chunked
+      date: Thu, 09 Jul 2026 16:49:09 GMT
+      keep-alive: timeout=60
+      connection: keep-alive
+    }
+  
+    status: {
+      code: 201
+      text: Created
+    }
+  
+    body: {
+      type: json
+      content: '''
+        {
+          "success": true,
+          "message": "Registration Successfull",
+          "data": {
+            "email": "siti@mail.com",
+            "id": "36afbf91-b525-4adb-b690-9bd2fdcad8b3",
+            "message": "Registration successful",
+            "name": "Siti Aminah",
+            "phone": "+6281234567892",
+            "referralCode": "AGN-B441",
+            "status": "PASSIVE"
+          }
+        }
+      '''
+    }
+  }
+}

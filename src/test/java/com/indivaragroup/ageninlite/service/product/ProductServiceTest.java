@@ -73,7 +73,10 @@ class ProductServiceTest {
     void updateProduct_Success_AllFields() {
         ProductUpdateRequestDto request = new ProductUpdateRequestDto();
         request.setProduct_name("Kopi ABC");
+        request.setCost_price(new BigDecimal("45000.00"));
         request.setSelling_price(new BigDecimal("55000.00"));
+        request.setAgent_fee(new BigDecimal("15.00"));
+        request.setSuper_agent_fee(new BigDecimal("7.00"));
         request.setProduct_status("INACTIVE");
 
         when(productRepository.findById(productId)).thenReturn(Optional.of(mockProduct));

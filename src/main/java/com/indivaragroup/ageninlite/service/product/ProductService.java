@@ -8,6 +8,7 @@ import com.indivaragroup.ageninlite.dto.product.ProductUpdateRequestDto;
 import com.indivaragroup.ageninlite.entity.MstProduct;
 import com.indivaragroup.ageninlite.repository.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +54,8 @@ public class ProductService {
 
     @Transactional
     public ProductResponseDto updateProduct(UUID productId, ProductUpdateRequestDto request) {
+        log.info("Process update product with ID: {}", productId);
+
         MstProduct product = productRepository.findById(productId)
                 .orElseThrow(() -> new AppException(ProductErrorCode.PRD_0002));
 
@@ -94,6 +97,8 @@ public class ProductService {
 
     @Transactional
     public ProductResponseDto setProductInactive(UUID productId) {
+        log.info("Process set inactive for product with ID: {}", productId);
+
         MstProduct product = productRepository.findById(productId)
                 .orElseThrow(() -> new AppException(ProductErrorCode.PRD_0002));
 
@@ -114,6 +119,8 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public List<ProductResponseDto> getAllProducts() {
+        log.info("Process get all products");
+
         return productRepository.findAll().stream()
                 .map(product -> ProductResponseDto.builder()
                         .product_id(product.getProductId())

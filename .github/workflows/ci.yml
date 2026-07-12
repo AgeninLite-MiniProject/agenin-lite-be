@@ -1,0 +1,127 @@
+name: CI
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  push:
+    branches:
+      - main
+      - development
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+  pull_request:
+    branches:
+      - main
+      - development
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Backend: Maven + JaCoCo
+  # ─────────────────────────────────────────────
+  backend:
+    name: Backend Tests (Java 21)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: agenin_test
+          POSTGRES_USER: agenin
+          POSTGRES_PASSWORD: agenin_test_pw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agenin"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/agenin_test
+      SPRING_DATASOURCE_USERNAME: agenin
+      SPRING_DATASOURCE_PASSWORD: agenin_test_pw
+      JWT_SECRET: ci_test_secret_do_not_use_in_production_at_all
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - name: Run tests + generate JaCoCo report
+        run: ./mvnw verify -B
+
+      - name: Upload JaCoCo HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          retention-days: 14
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: target/site/jacoco/jacoco.xml
+          flags: backend
+          fail_ci_if_error: false
+
+      - name: Detailed JaCoCo Report
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -c "
+          import csv, os, sys
+          csv_file = 'target/site/jacoco/jacoco.csv'
+          if not os.path.exists(csv_file):
+              sys.exit(0)
+          packages = {}
+          with open(csv_file, 'r') as f:
+              reader = csv.DictReader(f)
+              for row in reader:
+                  pkg = row['PACKAGE']
+                  if not pkg: continue
+                  if pkg not in packages:
+                      packages[pkg] = {'im': 0, 'ic': 0, 'bm': 0, 'bc': 0}
+                  packages[pkg]['im'] += int(row['INSTRUCTION_MISSED'])
+                  packages[pkg]['ic'] += int(row['INSTRUCTION_COVERED'])
+                  packages[pkg]['bm'] += int(row['BRANCH_MISSED'])
+                  packages[pkg]['bc'] += int(row['BRANCH_COVERED'])
+          md = '### Backend Coverage Details (Per Package)\n\n'
+          md += '| Package | Instructions Cov | Branches Cov |\n'
+          md += '|---------|------------------|--------------|\n'
+          for pkg, stats in packages.items():
+              i_tot = stats['im'] + stats['ic']
+              i_pct = f\"{(stats['ic']/i_tot*100):.1f}%\" if i_tot > 0 else 'N/A'
+              b_tot = stats['bm'] + stats['bc']
+              b_pct = f\"{(stats['bc']/b_tot*100):.1f}%\" if b_tot > 0 else 'N/A'
+              md += f'| {pkg} | {i_pct} | {b_pct} |\n'
+          
+          summary_file = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary_file:
+              with open(summary_file, 'a') as f:
+                  f.write(md + '\n')
+                  
+          with open('pr_comment.md', 'w') as f:
+              f.write(md)
+          "
+          
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body-file pr_comment.md || true
+          fi
+
