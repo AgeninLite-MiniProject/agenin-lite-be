@@ -23,9 +23,14 @@ public interface UserRepository extends JpaRepository<MstUser, UUID> {
     long countByRole(String role);
 
     @Query("SELECT u FROM MstUser u WHERE u.role = 'AGENT' AND " +
-           "(LOWER(u.userName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "LOWER(u.phoneNumber) LIKE LOWER(CONCAT('%', :query, '%')))")
-    Page<MstUser> searchUsers(@Param("query") String query, Pageable pageable);
+           "(:query IS NULL OR :query = '' OR LOWER(u.userName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(u.phoneNumber) LIKE LOWER(CONCAT('%', :query, '%'))) AND " +
+           "(:status IS NULL OR u.userStatus = :status) AND " +
+           "(:isDeleted IS NULL OR u.isDeleted = :isDeleted)")
+    Page<MstUser> searchUsers(
+            @Param("query") String query,
+            @Param("status") String status,
+            @Param("isDeleted") Boolean isDeleted,
+            Pageable pageable);
 
     Page<MstUser> findByRole(String role, Pageable pageable);
 }

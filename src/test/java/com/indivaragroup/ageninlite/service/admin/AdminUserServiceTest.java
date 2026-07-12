@@ -57,43 +57,40 @@ class AdminUserServiceTest {
     void searchUsers_WithNullQuery_ShouldReturnAllNonDeletedUsers() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<MstUser> page = new PageImpl<>(List.of(targetUser), pageable, 1);
-        when(userRepository.findByRole("AGENT", pageable)).thenReturn(page);
+        when(userRepository.searchUsers(null, null, null, pageable)).thenReturn(page);
 
-        PaginatedResponseDto<UserSearchResponseDto> result = adminUserService.searchUsers(null, 0, 20);
+        PaginatedResponseDto<UserSearchResponseDto> result = adminUserService.searchUsers(null, null, null, 0, 20);
 
         assertEquals(1, result.getContent().size());
         assertEquals("Target User", result.getContent().get(0).getName());
         assertEquals(1, result.getTotalElements());
         assertEquals(1, result.getTotalPages());
-        verify(userRepository).findByRole("AGENT", pageable);
-        verify(userRepository, never()).searchUsers(anyString(), any(Pageable.class));
+        verify(userRepository).searchUsers(null, null, null, pageable);
     }
 
     @Test
     void searchUsers_WithEmptyQuery_ShouldReturnAllNonDeletedUsers() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<MstUser> page = new PageImpl<>(List.of(targetUser), pageable, 1);
-        when(userRepository.findByRole("AGENT", pageable)).thenReturn(page);
+        when(userRepository.searchUsers("   ", "ACTIVE", false, pageable)).thenReturn(page);
 
-        PaginatedResponseDto<UserSearchResponseDto> result = adminUserService.searchUsers("   ", 0, 20);
+        PaginatedResponseDto<UserSearchResponseDto> result = adminUserService.searchUsers("   ", "ACTIVE", false, 0, 20);
 
         assertEquals(1, result.getContent().size());
-        verify(userRepository).findByRole("AGENT", pageable);
-        verify(userRepository, never()).searchUsers(anyString(), any(Pageable.class));
+        verify(userRepository).searchUsers("   ", "ACTIVE", false, pageable);
     }
 
     @Test
     void searchUsers_WithValidQuery_ShouldReturnMatchingUsers() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<MstUser> page = new PageImpl<>(List.of(targetUser), pageable, 1);
-        when(userRepository.searchUsers("Target", pageable)).thenReturn(page);
+        when(userRepository.searchUsers("Target", null, true, pageable)).thenReturn(page);
 
-        PaginatedResponseDto<UserSearchResponseDto> result = adminUserService.searchUsers("Target", 0, 20);
+        PaginatedResponseDto<UserSearchResponseDto> result = adminUserService.searchUsers("Target", null, true, 0, 20);
 
         assertEquals(1, result.getContent().size());
         assertEquals("Target User", result.getContent().get(0).getName());
-        verify(userRepository).searchUsers("Target", pageable);
-        verify(userRepository, never()).findByRole(anyString(), any(Pageable.class));
+        verify(userRepository).searchUsers("Target", null, true, pageable);
     }
 
     @Test
