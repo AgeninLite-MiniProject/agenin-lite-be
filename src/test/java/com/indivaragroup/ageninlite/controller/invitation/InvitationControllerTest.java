@@ -125,7 +125,7 @@ class InvitationControllerTest {
                         .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Validation Error"));
+                .andExpect(jsonPath("$.message").value("TRX_0004: Missing or invalid required field"));
         verify(invitationService, never()).send(any(), any());
     }
 
@@ -140,7 +140,7 @@ class InvitationControllerTest {
                         .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Validation Error"));
+                .andExpect(jsonPath("$.message").value("TRX_0004: Missing or invalid required field"));
         verify(invitationService, never()).send(any(), any());
     }
 
