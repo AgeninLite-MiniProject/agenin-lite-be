@@ -98,13 +98,13 @@ class InvitationServiceTest {
     // ==================== Group 1: send() ====================
 
     @Test
-    void send_WhenNewPair_ShouldPersistPendingInvitation() {
+    void send_Invitation_WhenNewPair_ShouldPersistPendingInvitation() {
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
         when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.empty());
         when(invitationRepository.save(any(TrxInvitation.class))).thenAnswer(i -> i.getArguments()[0]);
 
-        InvitationResponse result = invitationService.send(inviterId, request);
+        InvitationResponse result = invitationService.sendInvitation(inviterId, request);
 
         assertNotNull(result);
         assertEquals(inviterId, result.getInviterId());
@@ -115,13 +115,13 @@ class InvitationServiceTest {
     }
 
     @Test
-    void send_WhenExistingDeclined_ShouldResetTimestampsAndReinvite() {
+    void send_Invitation_WhenExistingDeclined_ShouldResetTimestampsAndReinvite() {
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
         when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("DECLINED")));
         when(invitationRepository.save(any(TrxInvitation.class))).thenAnswer(i -> i.getArguments()[0]);
 
-        InvitationResponse result = invitationService.send(inviterId, request);
+        InvitationResponse result = invitationService.sendInvitation(inviterId, request);
 
         assertEquals("PENDING", result.getStatus());
         ArgumentCaptor<TrxInvitation> captor = ArgumentCaptor.forClass(TrxInvitation.class);
@@ -132,60 +132,60 @@ class InvitationServiceTest {
     }
 
     @Test
-    void send_WhenSelfInvite_ShouldThrowInv0001() {
+    void send_Invitation_WhenSelfInvite_ShouldThrowInv0001() {
         SendInvitationRequest selfRequest = new SendInvitationRequest(inviterId);
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.send(inviterId, selfRequest));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.sendInvitation(inviterId, selfRequest));
         assertEquals(InvitationErrorCode.INV_0001, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void send_WhenInviteeHasUpline_ShouldThrowInv0004() {
+    void send_Invitation_WhenInviteeHasUpline_ShouldThrowInv0004() {
         invitee.setReferredBy(UUID.randomUUID());
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.send(inviterId, request));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.sendInvitation(inviterId, request));
         assertEquals(InvitationErrorCode.INV_0004, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void send_WhenInviterHas3Pending_ShouldThrowInv0005() {
+    void send_Invitation_WhenInviterHas3Pending_ShouldThrowInv0005() {
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
         when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(3L);
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.send(inviterId, request));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.sendInvitation(inviterId, request));
         assertEquals(InvitationErrorCode.INV_0005, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void send_WhenDuplicatePending_ShouldThrowInv0003() {
+    void send_Invitation_WhenDuplicatePending_ShouldThrowInv0003() {
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
         when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.send(inviterId, request));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.sendInvitation(inviterId, request));
         assertEquals(InvitationErrorCode.INV_0003, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void send_WhenInviteeNotFound_ShouldThrowInv0006() {
+    void send_Invitation_WhenInviteeNotFound_ShouldThrowInv0006() {
         when(userRepository.findById(inviteeId)).thenReturn(Optional.empty());
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.send(inviterId, request));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.sendInvitation(inviterId, request));
         assertEquals(InvitationErrorCode.INV_0006, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void send_WhenInviteeDeleted_ShouldThrowInv0007() {
+    void send_Invitation_WhenInviteeDeleted_ShouldThrowInv0007() {
         invitee.setDeleted(true);
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.send(inviterId, request));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.sendInvitation(inviterId, request));
         assertEquals(InvitationErrorCode.INV_0007, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
     }
@@ -193,7 +193,7 @@ class InvitationServiceTest {
     // ==================== Group 2: accept() ====================
 
     @Test
-    void accept_WhenCleanAndNoCompetitors_ShouldAcceptAndRefer() {
+    void accept_WhenCleanAndNoCompetitors_ShouldAcceptInvitationAndRefer() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
         when(userRepository.countByReferredBy(inviterId)).thenReturn(5);
@@ -201,7 +201,7 @@ class InvitationServiceTest {
         when(invitationRepository.save(any(TrxInvitation.class))).thenAnswer(i -> i.getArguments()[0]);
         when(invitationRepository.findAllByInviteeIdAndInvitationStatus(inviteeId, "PENDING")).thenReturn(List.of());
 
-        AcceptInvitationResponse result = invitationService.accept(inviterId, inviteeId);
+        AcceptInvitationResponse result = invitationService.acceptInvitation(inviterId, inviteeId);
 
         assertEquals("ACCEPTED", result.getStatus());
         assertEquals(0, result.getCancelledCount());
@@ -211,7 +211,7 @@ class InvitationServiceTest {
     }
 
     @Test
-    void accept_WhenOneCompetingPending_ShouldExpireCompetitor() {
+    void accept_Invitation_WhenOneCompetingPending_ShouldExpireCompetitor() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
         when(userRepository.countByReferredBy(inviterId)).thenReturn(5);
@@ -219,7 +219,7 @@ class InvitationServiceTest {
         when(invitationRepository.save(any(TrxInvitation.class))).thenAnswer(i -> i.getArguments()[0]);
         when(invitationRepository.findAllByInviteeIdAndInvitationStatus(inviteeId, "PENDING")).thenReturn(List.of(otherPendingInvitation));
 
-        AcceptInvitationResponse result = invitationService.accept(inviterId, inviteeId);
+        AcceptInvitationResponse result = invitationService.acceptInvitation(inviterId, inviteeId);
 
         assertEquals(1, result.getCancelledCount());
         ArgumentCaptor<TrxInvitation> captor = ArgumentCaptor.forClass(TrxInvitation.class);
@@ -229,62 +229,62 @@ class InvitationServiceTest {
     }
 
     @Test
-    void accept_WhenInvitationNotFound_ShouldThrowInv0013() {
+    void accept_Invitation_WhenInvitationNotFound_ShouldThrowInv0013() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.empty());
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.accept(inviterId, inviteeId));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.acceptInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0013, ex.getErrorCode());
         verify(userRepository, never()).save(any());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void accept_WhenStatusNotPending_ShouldThrowInv0011() {
+    void accept_Invitation_WhenStatusNotPending_ShouldThrowInv0011() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("ACCEPTED")));
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.accept(inviterId, inviteeId));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.acceptInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0011, ex.getErrorCode());
         verify(userRepository, never()).save(any());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void accept_WhenInviteeNowHasUpline_ShouldThrowInv0012() {
+    void accept_Invitation_WhenInviteeNowHasUpline_ShouldThrowInv0012() {
         invitee.setReferredBy(UUID.randomUUID());
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.accept(inviterId, inviteeId));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.acceptInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0012, ex.getErrorCode());
         verify(userRepository, never()).save(any(MstUser.class));
         verify(invitationRepository, never()).save(any(TrxInvitation.class));
     }
 
     @Test
-    void accept_WhenInviteeNotFound_ShouldThrowInv0006() {
+    void accept_Invitation_WhenInviteeNotFound_ShouldThrowInv0006() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
         when(userRepository.findById(inviteeId)).thenReturn(Optional.empty());
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.accept(inviterId, inviteeId));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.acceptInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0006, ex.getErrorCode());
         verify(userRepository, never()).save(any());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void accept_WhenInviteeDeleted_ShouldThrowInv0007() {
+    void accept_Invitation_WhenInviteeDeleted_ShouldThrowInv0007() {
         invitee.setDeleted(true);
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.accept(inviterId, inviteeId));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.acceptInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0007, ex.getErrorCode());
         verify(userRepository, never()).save(any());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void accept_WhenPendingListIncludesOwnInvitation_ShouldFilterItOut() {
+    void accept_Invitation_WhenPendingListIncludesOwnInvitation_ShouldFilterItOut() {
         TrxInvitation ownPending = TrxInvitation.builder()
                 .invitationId(UUID.randomUUID())
                 .inviterId(inviterId)
@@ -300,7 +300,7 @@ class InvitationServiceTest {
         when(invitationRepository.findAllByInviteeIdAndInvitationStatus(inviteeId, "PENDING"))
                 .thenReturn(List.of(ownPending, otherPendingInvitation));
 
-        AcceptInvitationResponse result = invitationService.accept(inviterId, inviteeId);
+        AcceptInvitationResponse result = invitationService.acceptInvitation(inviterId, inviteeId);
 
         assertEquals(1, result.getCancelledCount());
         ArgumentCaptor<TrxInvitation> captor = ArgumentCaptor.forClass(TrxInvitation.class);
@@ -309,13 +309,13 @@ class InvitationServiceTest {
     }
 
     @Test
-    void accept_WhenInviterAt10Downliners_ShouldExpireAndThrowInv0010() {
+    void accept_Invitation_WhenInviterAt10Downliners_ShouldExpireAndThrowInv0010() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
         when(userRepository.countByReferredBy(inviterId)).thenReturn(10);
         when(invitationRepository.save(any(TrxInvitation.class))).thenAnswer(i -> i.getArguments()[0]);
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.accept(inviterId, inviteeId));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.acceptInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0010, ex.getErrorCode());
         ArgumentCaptor<TrxInvitation> captor = ArgumentCaptor.forClass(TrxInvitation.class);
         verify(invitationRepository).save(captor.capture());
@@ -326,11 +326,11 @@ class InvitationServiceTest {
     // ==================== Group 3: decline() ====================
 
     @Test
-    void decline_WhenPending_ShouldSetDeclinedAndRespondedAt() {
+    void decline_Invitation_WhenPending_ShouldSetDeclinedAndRespondedAt() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
         when(invitationRepository.save(any(TrxInvitation.class))).thenAnswer(i -> i.getArguments()[0]);
 
-        DeclineInvitationResponse result = invitationService.decline(inviterId, inviteeId);
+        DeclineInvitationResponse result = invitationService.declineInvitation(inviterId, inviteeId);
 
         assertEquals("DECLINED", result.getStatus());
         assertNotNull(result.getRespondedAt());
@@ -343,19 +343,19 @@ class InvitationServiceTest {
     }
 
     @Test
-    void decline_WhenInvitationNotFound_ShouldThrowInv0014() {
+    void decline_Invitation_WhenInvitationNotFound_ShouldThrowInv0014() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.empty());
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.decline(inviterId, inviteeId));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.declineInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0014, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void decline_WhenStatusNotPending_ShouldThrowInv0011() {
+    void decline_Invitation_WhenStatusNotPending_ShouldThrowInv0011() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("ACCEPTED")));
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.decline(inviterId, inviteeId));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.declineInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0011, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
     }
@@ -363,11 +363,11 @@ class InvitationServiceTest {
     // ==================== Group 4: cancel() ====================
 
     @Test
-    void cancel_WhenPendingAndOwner_ShouldSetCancelledAndCancelledAt() {
+    void cancel_Invitation_WhenPendingAndOwner_ShouldSetCancelledAndCancelledAt() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
         when(invitationRepository.save(any(TrxInvitation.class))).thenAnswer(i -> i.getArguments()[0]);
 
-        CancelInvitationResponse result = invitationService.cancel(inviterId, inviteeId);
+        CancelInvitationResponse result = invitationService.cancelInvitation(inviterId, inviteeId);
 
         assertEquals("CANCELLED", result.getStatus());
         assertNotNull(result.getCancelledAt());
@@ -380,19 +380,19 @@ class InvitationServiceTest {
     }
 
     @Test
-    void cancel_WhenInvitationNotFound_ShouldThrowInv0014() {
+    void cancel_Invitation_WhenInvitationNotFound_ShouldThrowInv0014() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.empty());
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.cancel(inviterId, inviteeId));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.cancelInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0014, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
     }
 
     @Test
-    void cancel_WhenStatusNotPending_ShouldThrowInv0011() {
+    void cancel_Invitation_WhenStatusNotPending_ShouldThrowInv0011() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("ACCEPTED")));
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.cancel(inviterId, inviteeId));
+        AppException ex = assertThrows(AppException.class, () -> invitationService.cancelInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0011, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
     }
