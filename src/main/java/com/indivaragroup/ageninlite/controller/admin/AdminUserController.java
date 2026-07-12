@@ -24,13 +24,15 @@ public class AdminUserController {
     @GetMapping
     public ResponseEntity<PaginatedResponseDto<UserSearchResponseDto>> searchUsers(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean isDeleted,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
         if (size > 100) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(adminUserService.searchUsers(q, page, size));
+        return ResponseEntity.ok(adminUserService.searchUsers(q, status, isDeleted, page, size));
     }
 
     @PostMapping("/{userId}/delete")

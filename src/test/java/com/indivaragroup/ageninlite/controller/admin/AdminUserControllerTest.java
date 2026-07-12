@@ -78,7 +78,7 @@ class AdminUserControllerTest {
                 .totalPages(1)
                 .build();
 
-        when(adminUserService.searchUsers(null, 0, 20)).thenReturn(paginatedResponse);
+        when(adminUserService.searchUsers(null, null, null, 0, 20)).thenReturn(paginatedResponse);
 
         mockMvc.perform(get("/api/admin/users")
                 .contentType(MediaType.APPLICATION_JSON))
@@ -106,7 +106,7 @@ class AdminUserControllerTest {
                 .totalPages(1)
                 .build();
 
-        when(adminUserService.searchUsers("Test", 0, 20)).thenReturn(paginatedResponse);
+        when(adminUserService.searchUsers("Test", null, null, 0, 20)).thenReturn(paginatedResponse);
 
         mockMvc.perform(get("/api/admin/users")
                 .param("q", "Test")

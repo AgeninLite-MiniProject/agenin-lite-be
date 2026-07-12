@@ -27,17 +27,11 @@ public class AdminUserService {
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public PaginatedResponseDto<UserSearchResponseDto> searchUsers(String query, int page, int size) {
-        log.info("Process search users with query: {}, page: {}, size: {}", query != null ? query : "ALL", page, size);
+    public PaginatedResponseDto<UserSearchResponseDto> searchUsers(String query, String status, Boolean isDeleted, int page, int size) {
+        log.info("Process search users with query: {}, status: {}, isDeleted: {}, page: {}, size: {}", query, status, isDeleted, page, size);
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<MstUser> userPage;
-
-        if (query != null && !query.trim().isEmpty()) {
-            userPage = userRepository.searchUsers(query, pageable);
-        } else {
-            userPage = userRepository.findByRole("AGENT", pageable);
-        }
+        Page<MstUser> userPage = userRepository.searchUsers(query, status, isDeleted, pageable);
 
         List<UserSearchResponseDto> content = userPage.getContent().stream().map(user -> UserSearchResponseDto.builder()
                 .user_id(user.getUserId())
