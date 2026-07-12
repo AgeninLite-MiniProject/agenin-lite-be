@@ -15,6 +15,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductService {
@@ -23,13 +26,9 @@ public class ProductService {
 
     @Transactional
     public ProductResponseDto createProduct(ProductCreateRequestDto request) {
-<<<<<<< Updated upstream
-=======
         log.info("Process create product with name: {}", request.getProduct_name());
 
         validatePricingAndFee(request.getCost_price(), request.getSelling_price(), request.getAgent_fee(), request.getSuper_agent_fee());
-
->>>>>>> Stashed changes
         MstProduct newProduct = MstProduct.builder()
                 .productName(request.getProduct_name())
                 .costPrice(request.getCost_price())
@@ -76,7 +75,8 @@ public class ProductService {
             product.setProductStatus(request.getProduct_status());
         }
 
-        validatePricingAndFee(product.getCostPrice(), product.getSellingPrice(), product.getAgentFee(), product.getSuperAgentFee());
+        validatePricingAndFee(product.getCostPrice(), product.getSellingPrice(), product.getAgentFee(),
+                product.getSuperAgentFee());
 
         MstProduct updatedProduct = productRepository.save(product);
 
@@ -91,6 +91,7 @@ public class ProductService {
                 .message("Product updated successfully")
                 .build();
     }
+
     @Transactional
     public ProductResponseDto setProductInactive(UUID productId) {
         MstProduct product = productRepository.findById(productId)
@@ -127,7 +128,8 @@ public class ProductService {
                 .toList();
     }
 
-    private void validatePricingAndFee(BigDecimal costPrice, BigDecimal sellingPrice, BigDecimal agentFee, BigDecimal superAgentFee) {
+    private void validatePricingAndFee(BigDecimal costPrice, BigDecimal sellingPrice, BigDecimal agentFee,
+            BigDecimal superAgentFee) {
         if (sellingPrice.compareTo(costPrice) <= 0) {
             throw new AppException(ProductErrorCode.PRD_0009);
         }
