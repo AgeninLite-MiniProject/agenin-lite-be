@@ -19,6 +19,8 @@ public interface UserRepository extends JpaRepository<MstUser, UUID> {
     boolean existsByPhoneNumber(String phoneNumber);
     boolean existsByEmail(String email);
     int countByReferredBy(UUID referredBy);
+    long countByRoleAndUserStatusAndIsDeletedFalse(String role, String userStatus);
+    long countByRole(String role);
 
     @Query("SELECT u FROM MstUser u WHERE u.role = 'AGENT' AND " +
            "(LOWER(u.userName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
