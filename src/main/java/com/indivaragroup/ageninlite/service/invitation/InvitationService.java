@@ -12,6 +12,7 @@ import com.indivaragroup.ageninlite.entity.TrxInvitation;
 import com.indivaragroup.ageninlite.repository.auth.UserRepository;
 import com.indivaragroup.ageninlite.repository.invitation.TrxInvitationRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class InvitationService {
@@ -59,6 +61,7 @@ public class InvitationService {
             if (STATUS_PENDING.equals(inv.getInvitationStatus())) {
                 throw new AppException(InvitationErrorCode.INV_0003);
             }
+            log.info("invitation resent inviterId={} inviteeId={} previousStatus={}", inviterId, inviteeId, inv.getInvitationStatus());
             inv.setInvitationStatus(STATUS_PENDING);
             inv.setRespondedAt(null);
             inv.setCancelledAt(null);
@@ -74,6 +77,7 @@ public class InvitationService {
                 .invitationStatus(STATUS_PENDING)
                 .build();
         TrxInvitation saved = invitationRepository.save(invitation);
+        log.info("invitation sent inviterId={} inviteeId={} invitationId={}", inviterId, inviteeId, saved.getInvitationId());
 
         // TODO: audit — call AuditService.log(actorId=inviterId, action="INVITE_SENT", entityType="INVITATION", entityId=saved.getInvitationId(), payload=...)
         // Will be implemented when AuditService exists.
@@ -109,10 +113,12 @@ public class InvitationService {
                 .toList();
 
         for (TrxInvitation other : otherPending) {
+            log.info("competing invitation auto-expired inviteeId={} expiredInviterId={} acceptedInviterId={}", inviteeId, other.getInviterId(), inviterId);
             other.setInvitationStatus(STATUS_EXPIRED);
             invitationRepository.save(other);
         }
 
+        log.info("invitation accepted inviterId={} inviteeId={} downlinerCount={}", inviterId, inviteeId, userRepository.countByReferredBy(inviterId));
         return AcceptInvitationResponse.builder()
                 .inviterId(inviterId)
                 .inviteeId(inviteeId)
@@ -131,6 +137,7 @@ public class InvitationService {
         markTerminal(invitation, STATUS_DECLINED);
         // TODO: audit INVITE_DECLINED with payload { inviterId, inviteeId }
 
+        log.info("invitation declined inviterId={} inviteeId={}", inviterId, inviteeId);
         return DeclineInvitationResponse.builder()
                 .inviterId(inviterId)
                 .inviteeId(inviteeId)
@@ -152,6 +159,7 @@ public class InvitationService {
         markTerminal(invitation, STATUS_CANCELLED);
         // TODO: audit INVITE_CANCELLED with payload { inviterId, inviteeId }
 
+        log.info("invitation cancelled inviterId={} inviteeId={}", inviterId, inviteeId);
         return CancelInvitationResponse.builder()
                 .inviterId(inviterId)
                 .inviteeId(inviteeId)
