@@ -2,17 +2,20 @@ package com.indivaragroup.ageninlite.dto.auth;
 
 import lombok.Builder;
 import lombok.Data;
-import tools.jackson.databind.PropertyNamingStrategies;
-import tools.jackson.databind.annotation.JsonNaming;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Data
 @Builder
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class RefreshResponseDto {
-
+    @JsonProperty("access_token")
     private String accessToken;
-    private String refreshToken;
-    private String tokenType;
-    private Integer expiresIn;
 
+    @JsonProperty("refresh_token")
+    private String refreshToken;
+
+    @JsonProperty("token_type")
+    private String tokenType;
+
+    @JsonProperty("expires_in")
+    private Integer expiresIn;
 }

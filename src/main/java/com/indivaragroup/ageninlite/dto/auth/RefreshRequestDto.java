@@ -2,14 +2,11 @@ package com.indivaragroup.ageninlite.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
-import tools.jackson.databind.PropertyNamingStrategies;
-import tools.jackson.databind.annotation.JsonNaming;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Data
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class RefreshRequestDto {
-
-    @NotBlank
+    @NotBlank(message = "AUTH_0003")
+    @JsonProperty("refresh_token")
     private String refreshToken;
-
 }

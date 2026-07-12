@@ -6,11 +6,15 @@ import com.indivaragroup.ageninlite.dto.auth.LoginRequestDto;
 import com.indivaragroup.ageninlite.dto.auth.LoginResponseDto;
 import com.indivaragroup.ageninlite.dto.auth.RegisterRequestDto;
 import com.indivaragroup.ageninlite.dto.auth.RegisterResponseDto;
+import com.indivaragroup.ageninlite.dto.auth.RefreshRequestDto;
+import com.indivaragroup.ageninlite.dto.auth.RefreshResponseDto;
 import com.indivaragroup.ageninlite.entity.AuthRefreshToken;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.repository.auth.RefreshTokenRepository;
 import com.indivaragroup.ageninlite.repository.auth.UserRepository;
 import com.indivaragroup.ageninlite.security.JwtUtil;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.impl.DefaultClaims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +25,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.time.LocalDateTime;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +49,7 @@ class AuthServiceTest {
 
     private RegisterRequestDto registerRequest;
     private LoginRequestDto loginRequest;
+    private RefreshRequestDto refreshRequest;
     private MstUser inviter;
     private MstUser existingUser;
 
@@ -57,6 +64,9 @@ class AuthServiceTest {
         loginRequest = new LoginRequestDto();
         loginRequest.setPhoneNumber("+628123");
         loginRequest.setPassword("password123");
+
+        refreshRequest = new RefreshRequestDto();
+        refreshRequest.setRefreshToken("raw_refresh_token");
 
         inviter = new MstUser();
         inviter.setUserId(UUID.randomUUID());
@@ -232,5 +242,204 @@ class AuthServiceTest {
         assertNotNull(response);
         verify(userRepository).save(any(MstUser.class));
         verify(userRepository, never()).existsByEmail(anyString());
+    }
+
+    // --- TEST REFRESH ---
+
+    @Test
+    void refresh_Success() {
+        String tokenId = UUID.randomUUID().toString();
+        Claims claims = new DefaultClaims(Map.of(
+                "tokenId", tokenId,
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .tokenId(tokenId)
+                .tokenHash("storedHash")
+                .expiresAt(LocalDateTime.now().plusDays(1))
+                .build();
+
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.of(storedToken));
+        when(passwordEncoder.matches(anyString(), eq("storedHash"))).thenReturn(true);
+        when(userRepository.findById(existingUser.getUserId())).thenReturn(Optional.of(existingUser));
+        
+        when(jwtUtil.generateToken(any(), any(), any())).thenReturn("new_access_jwt");
+        when(jwtUtil.generateRefreshToken(any(), any())).thenReturn("new_refresh_jwt");
+        when(passwordEncoder.encode(anyString())).thenReturn("new_hashed_refresh");
+
+        RefreshResponseDto response = authService.refresh(refreshRequest);
+
+        assertNotNull(response);
+        assertEquals("new_access_jwt", response.getAccessToken());
+        assertEquals("new_refresh_jwt", response.getRefreshToken());
+        assertNotNull(storedToken.getRevokedAt()); // Check if old token was revoked
+        verify(refreshTokenRepository, times(2)).save(any(AuthRefreshToken.class)); // save old & new
+    }
+
+    @Test
+    void refresh_Failed_InvalidToken() {
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(false);
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
+    }
+
+    @Test
+    void refresh_Failed_TokenIdMissing() {
+        Claims claims = new DefaultClaims(Map.of(
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
+    }
+
+    @Test
+    void refresh_Failed_TokenExpiredInDb() {
+        String tokenId = UUID.randomUUID().toString();
+        Claims claims = new DefaultClaims(Map.of(
+                "tokenId", tokenId,
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .tokenId(tokenId)
+                .tokenHash("storedHash")
+                .expiresAt(LocalDateTime.now().minusDays(1)) // expired!
+                .build();
+
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.of(storedToken));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
+    }
+
+    @Test
+    void refresh_Failed_ExtractClaimsThrowsException() {
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenThrow(new RuntimeException("Parsing error"));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
+    }
+
+    @Test
+    void refresh_Failed_TokenIdNotFoundInDb() {
+        String tokenId = UUID.randomUUID().toString();
+        Claims claims = new DefaultClaims(Map.of(
+                "tokenId", tokenId,
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.empty());
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
+    }
+
+    @Test
+    void refresh_Failed_HashMismatch() {
+        String tokenId = UUID.randomUUID().toString();
+        Claims claims = new DefaultClaims(Map.of(
+                "tokenId", tokenId,
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .tokenId(tokenId)
+                .tokenHash("storedHash")
+                .expiresAt(LocalDateTime.now().plusDays(1))
+                .build();
+
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.of(storedToken));
+        when(passwordEncoder.matches(anyString(), eq("storedHash"))).thenReturn(false);
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
+    }
+
+    @Test
+    void refresh_Failed_UserNotFound() {
+        String tokenId = UUID.randomUUID().toString();
+        Claims claims = new DefaultClaims(Map.of(
+                "tokenId", tokenId,
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .tokenId(tokenId)
+                .tokenHash("storedHash")
+                .expiresAt(LocalDateTime.now().plusDays(1))
+                .build();
+
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.of(storedToken));
+        when(passwordEncoder.matches(anyString(), eq("storedHash"))).thenReturn(true);
+        when(userRepository.findById(existingUser.getUserId())).thenReturn(Optional.empty());
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
+    }
+
+    @Test
+    void refresh_Failed_UserDeleted() {
+        String tokenId = UUID.randomUUID().toString();
+        Claims claims = new DefaultClaims(Map.of(
+                "tokenId", tokenId,
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .tokenId(tokenId)
+                .tokenHash("storedHash")
+                .expiresAt(LocalDateTime.now().plusDays(1))
+                .build();
+
+        existingUser.setDeleted(true);
+
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.of(storedToken));
+        when(passwordEncoder.matches(anyString(), eq("storedHash"))).thenReturn(true);
+        when(userRepository.findById(existingUser.getUserId())).thenReturn(Optional.of(existingUser));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0011, ex.getErrorCode());
+    }
+
+    @Test
+    void refresh_Failed_TokenRevokedInDb() {
+        String tokenId = UUID.randomUUID().toString();
+        Claims claims = new DefaultClaims(Map.of(
+                "tokenId", tokenId,
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .tokenId(tokenId)
+                .tokenHash("storedHash")
+                .expiresAt(LocalDateTime.now().plusDays(1))
+                .revokedAt(LocalDateTime.now().minusDays(1)) // revoked!
+                .build();
+
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.of(storedToken));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
     }
 }
