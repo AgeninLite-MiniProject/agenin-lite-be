@@ -100,7 +100,7 @@ class InvitationControllerTest {
                 .createdAt(LocalDateTime.now())
                 .message("Invitation sent successfully")
                 .build();
-        when(invitationService.send(any(), any())).thenReturn(response);
+        when(invitationService.sendInvitation(any(), any())).thenReturn(response);
 
         // Act & Assert
         mockMvc.perform(post("/api/invitations")
@@ -126,7 +126,7 @@ class InvitationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("TRX_0004: Missing or invalid required field"));
-        verify(invitationService, never()).send(any(), any());
+        verify(invitationService, never()).sendInvitation(any(), any());
     }
 
     @Test
@@ -141,14 +141,14 @@ class InvitationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("TRX_0004: Missing or invalid required field"));
-        verify(invitationService, never()).send(any(), any());
+        verify(invitationService, never()).sendInvitation(any(), any());
     }
 
     @Test
     void send_WhenServiceThrowsInv0006_ShouldReturn404() throws Exception {
         // Arrange
         SendInvitationRequest request = new SendInvitationRequest(inviteeId);
-        when(invitationService.send(any(), any()))
+        when(invitationService.sendInvitation(any(), any()))
                 .thenThrow(new AppException(InvitationErrorCode.INV_0006));
 
         // Act & Assert
@@ -175,7 +175,7 @@ class InvitationControllerTest {
                 .cancelledCount(0)
                 .message("Invitation accepted")
                 .build();
-        when(invitationService.accept(eq(inviterId), eq(inviteeId))).thenReturn(response);
+        when(invitationService.acceptInvitation(eq(inviterId), eq(inviteeId))).thenReturn(response);
 
         // Act & Assert
         mockMvc.perform(post("/api/invitations/{inviterId}/accept", inviterId))
@@ -190,7 +190,7 @@ class InvitationControllerTest {
     void accept_WhenServiceThrowsInv0013_ShouldReturn404() throws Exception {
         // Arrange
         setJwtPrincipal(inviteeId);
-        when(invitationService.accept(eq(inviterId), eq(inviteeId)))
+        when(invitationService.acceptInvitation(eq(inviterId), eq(inviteeId)))
                 .thenThrow(new AppException(InvitationErrorCode.INV_0013));
 
         // Act & Assert
@@ -207,7 +207,7 @@ class InvitationControllerTest {
         // Act & Assert
         mockMvc.perform(post("/api/invitations/not-a-uuid/accept"))
                 .andExpect(status().isBadRequest());
-        verify(invitationService, never()).accept(any(), any());
+        verify(invitationService, never()).acceptInvitation(any(), any());
     }
 
     // ===== Group 3: decline (POST /api/invitations/{inviterId}/decline) =====
@@ -223,7 +223,7 @@ class InvitationControllerTest {
                 .respondedAt(LocalDateTime.now())
                 .message("Invitation declined")
                 .build();
-        when(invitationService.decline(eq(inviterId), eq(inviteeId))).thenReturn(response);
+        when(invitationService.declineInvitation(eq(inviterId), eq(inviteeId))).thenReturn(response);
 
         // Act & Assert
         mockMvc.perform(post("/api/invitations/{inviterId}/decline", inviterId))
@@ -236,7 +236,7 @@ class InvitationControllerTest {
     void decline_WhenServiceThrowsInv0014_ShouldReturn404() throws Exception {
         // Arrange
         setJwtPrincipal(inviteeId);
-        when(invitationService.decline(eq(inviterId), eq(inviteeId)))
+        when(invitationService.declineInvitation(eq(inviterId), eq(inviteeId)))
                 .thenThrow(new AppException(InvitationErrorCode.INV_0014));
 
         // Act & Assert
@@ -253,7 +253,7 @@ class InvitationControllerTest {
         // Act & Assert
         mockMvc.perform(post("/api/invitations/not-a-uuid/decline"))
                 .andExpect(status().isBadRequest());
-        verify(invitationService, never()).decline(any(), any());
+        verify(invitationService, never()).declineInvitation(any(), any());
     }
 
     // ===== Group 4: cancel (POST /api/invitations/{inviteeId}/cancel) =====
@@ -268,7 +268,7 @@ class InvitationControllerTest {
                 .cancelledAt(LocalDateTime.now())
                 .message("Invitation cancelled")
                 .build();
-        when(invitationService.cancel(eq(inviterId), eq(inviteeId))).thenReturn(response);
+        when(invitationService.cancelInvitation(eq(inviterId), eq(inviteeId))).thenReturn(response);
 
         // Act & Assert
         mockMvc.perform(post("/api/invitations/{inviteeId}/cancel", inviteeId))
@@ -280,7 +280,7 @@ class InvitationControllerTest {
     @Test
     void cancel_WhenServiceThrowsInv0011_ShouldReturn400() throws Exception {
         // Arrange
-        when(invitationService.cancel(eq(inviterId), eq(inviteeId)))
+        when(invitationService.cancelInvitation(eq(inviterId), eq(inviteeId)))
                 .thenThrow(new AppException(InvitationErrorCode.INV_0011));
 
         // Act & Assert
@@ -294,6 +294,6 @@ class InvitationControllerTest {
         // Act & Assert
         mockMvc.perform(post("/api/invitations/not-a-uuid/cancel"))
                 .andExpect(status().isBadRequest());
-        verify(invitationService, never()).cancel(any(), any());
+        verify(invitationService, never()).cancelInvitation(any(), any());
     }
 }

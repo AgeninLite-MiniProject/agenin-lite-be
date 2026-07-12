@@ -35,7 +35,7 @@ public class InvitationService {
     private final UserRepository userRepository;
 
     @Transactional
-    public InvitationResponse send(UUID inviterId, SendInvitationRequest request) {
+    public InvitationResponse sendInvitation(UUID inviterId, SendInvitationRequest request) {
         UUID inviteeId = request.getInviteeId();
 
         if (inviterId.equals(inviteeId)) {
@@ -82,7 +82,7 @@ public class InvitationService {
     }
 
     @Transactional
-    public AcceptInvitationResponse accept(UUID inviterId, UUID inviteeId) {
+    public AcceptInvitationResponse acceptInvitation(UUID inviterId, UUID inviteeId) {
         TrxInvitation invitation = findPendingOrThrow(inviterId, inviteeId, InvitationErrorCode.INV_0013);
 
         MstUser invitee = findActiveInviteeOrThrow(inviteeId);
@@ -125,7 +125,7 @@ public class InvitationService {
     }
 
     @Transactional
-    public DeclineInvitationResponse decline(UUID inviterId, UUID inviteeId) {
+    public DeclineInvitationResponse declineInvitation(UUID inviterId, UUID inviteeId) {
         TrxInvitation invitation = findPendingOrThrow(inviterId, inviteeId, InvitationErrorCode.INV_0014);
 
         markTerminal(invitation, STATUS_DECLINED);
@@ -141,7 +141,7 @@ public class InvitationService {
     }
 
     @Transactional
-    public CancelInvitationResponse cancel(UUID inviterId, UUID inviteeId) {
+    public CancelInvitationResponse cancelInvitation(UUID inviterId, UUID inviteeId) {
         TrxInvitation invitation = invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)
                 .orElseThrow(() -> new AppException(InvitationErrorCode.INV_0014));
 

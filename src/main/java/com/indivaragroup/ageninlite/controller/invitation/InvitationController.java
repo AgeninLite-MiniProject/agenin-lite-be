@@ -32,7 +32,7 @@ public class InvitationController {
             @Valid @RequestBody SendInvitationRequest request
     ) {
         UUID inviterUuid = UUID.fromString(inviterId);
-        InvitationResponse response = invitationService.send(inviterUuid, request);
+        InvitationResponse response = invitationService.sendInvitation(inviterUuid, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponse<>(true, "Invitation sent successfully", response));
     }
@@ -43,7 +43,7 @@ public class InvitationController {
             @PathVariable UUID inviterId
     ) {
         UUID inviteeUuid = UUID.fromString(inviteeId);
-        AcceptInvitationResponse response = invitationService.accept(inviterId, inviteeUuid);
+        AcceptInvitationResponse response = invitationService.acceptInvitation(inviterId, inviteeUuid);
         return ResponseEntity.ok(new ApiResponse<>(true, "Invitation accepted", response));
     }
 
@@ -53,7 +53,7 @@ public class InvitationController {
             @PathVariable UUID inviterId
     ) {
         UUID inviteeUuid = UUID.fromString(inviteeId);
-        DeclineInvitationResponse response = invitationService.decline(inviterId, inviteeUuid);
+        DeclineInvitationResponse response = invitationService.declineInvitation(inviterId, inviteeUuid);
         return ResponseEntity.ok(new ApiResponse<>(true, "Invitation declined", response));
     }
 
@@ -63,7 +63,7 @@ public class InvitationController {
             @PathVariable UUID inviteeId
     ) {
         UUID inviterUuid = UUID.fromString(inviterId);
-        CancelInvitationResponse response = invitationService.cancel(inviterUuid, inviteeId);
+        CancelInvitationResponse response = invitationService.cancelInvitation(inviterUuid, inviteeId);
         return ResponseEntity.ok(new ApiResponse<>(true, "Invitation cancelled", response));
     }
 }
