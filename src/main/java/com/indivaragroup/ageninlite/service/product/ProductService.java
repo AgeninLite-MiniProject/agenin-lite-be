@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,6 +23,13 @@ public class ProductService {
 
     @Transactional
     public ProductResponseDto createProduct(ProductCreateRequestDto request) {
+<<<<<<< Updated upstream
+=======
+        log.info("Process create product with name: {}", request.getProduct_name());
+
+        validatePricingAndFee(request.getCost_price(), request.getSelling_price(), request.getAgent_fee(), request.getSuper_agent_fee());
+
+>>>>>>> Stashed changes
         MstProduct newProduct = MstProduct.builder()
                 .productName(request.getProduct_name())
                 .costPrice(request.getCost_price())
@@ -67,6 +75,8 @@ public class ProductService {
         if (request.getProduct_status() != null) {
             product.setProductStatus(request.getProduct_status());
         }
+
+        validatePricingAndFee(product.getCostPrice(), product.getSellingPrice(), product.getAgentFee(), product.getSuperAgentFee());
 
         MstProduct updatedProduct = productRepository.save(product);
 
@@ -115,5 +125,16 @@ public class ProductService {
                         .message("Success")
                         .build())
                 .toList();
+    }
+
+    private void validatePricingAndFee(BigDecimal costPrice, BigDecimal sellingPrice, BigDecimal agentFee, BigDecimal superAgentFee) {
+        if (sellingPrice.compareTo(costPrice) <= 0) {
+            throw new AppException(ProductErrorCode.PRD_0009);
+        }
+
+        BigDecimal totalFee = agentFee.add(superAgentFee);
+        if (totalFee.compareTo(new BigDecimal("100.00")) > 0) {
+            throw new AppException(ProductErrorCode.PRD_0010);
+        }
     }
 }
