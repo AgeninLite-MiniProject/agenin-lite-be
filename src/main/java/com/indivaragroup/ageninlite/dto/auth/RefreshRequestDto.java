@@ -2,18 +2,14 @@ package com.indivaragroup.ageninlite.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
 @Data
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class LoginRequestDto {
+public class RefreshRequestDto {
 
-    @NotBlank(message = "AUTH_0003")
-    private String phoneNumber;
+    @NotBlank
+    private String refreshToken;
 
-    @NotBlank(message = "AUTH_0003")
-    private String password;
 }

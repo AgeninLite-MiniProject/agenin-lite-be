@@ -1,7 +1,6 @@
 package com.indivaragroup.ageninlite.controller.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.indivaragroup.ageninlite.controller.AuthController;
 import com.indivaragroup.ageninlite.dto.auth.LoginRequestDto;
 import com.indivaragroup.ageninlite.dto.auth.LoginResponseDto;
 import com.indivaragroup.ageninlite.dto.auth.RegisterRequestDto;
@@ -49,14 +48,14 @@ class AuthControllerTest {
     void register_ShouldReturn201() throws Exception {
         RegisterRequestDto request = new RegisterRequestDto();
         request.setName("Budi");
-        request.setPhone("+6281234567890");
+        request.setPhoneNumber("+6281234567890");
         request.setEmail("budi@mail.com");
         request.setPassword("password123");
 
         RegisterResponseDto response = RegisterResponseDto.builder()
-                .id(UUID.randomUUID())
+                .userId(UUID.randomUUID())
                 .name("Budi")
-                .status("PASSIVE")
+                .userStatus("PASSIVE")
                 .build();
 
         when(authService.register(any(RegisterRequestDto.class))).thenReturn(response);
@@ -73,7 +72,7 @@ class AuthControllerTest {
     void register_WhenValidationFails_ShouldReturn400() throws Exception {
         // Name is missing, phone is blank, etc
         RegisterRequestDto request = new RegisterRequestDto();
-        request.setPhone(""); 
+        request.setPhoneNumber(""); 
 
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -85,7 +84,7 @@ class AuthControllerTest {
     @Test
     void login_ShouldReturn200() throws Exception {
         LoginRequestDto request = new LoginRequestDto();
-        request.setPhone("+6281234567890");
+        request.setPhoneNumber("+6281234567890");
         request.setPassword("password123");
 
         LoginResponseDto response = LoginResponseDto.builder()
@@ -107,7 +106,7 @@ class AuthControllerTest {
     @Test
     void login_WhenServiceThrowsException_ShouldReturnError() throws Exception {
         LoginRequestDto request = new LoginRequestDto();
-        request.setPhone("+6281234567890");
+        request.setPhoneNumber("+6281234567890");
         request.setPassword("wrongpassword");
 
         when(authService.login(any(LoginRequestDto.class)))

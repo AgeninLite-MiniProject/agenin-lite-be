@@ -50,12 +50,12 @@ class AuthServiceTest {
     void setUp() {
         registerRequest = new RegisterRequestDto();
         registerRequest.setName("Budi");
-        registerRequest.setPhone("+628123");
+        registerRequest.setPhoneNumber("+628123");
         registerRequest.setPassword("password123");
         registerRequest.setEmail("budi@mail.com");
 
         loginRequest = new LoginRequestDto();
-        loginRequest.setPhone("+628123");
+        loginRequest.setPhoneNumber("+628123");
         loginRequest.setPassword("password123");
 
         inviter = new MstUser();

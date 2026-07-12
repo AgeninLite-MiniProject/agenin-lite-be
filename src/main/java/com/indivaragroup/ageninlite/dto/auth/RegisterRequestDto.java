@@ -3,11 +3,12 @@ package com.indivaragroup.ageninlite.dto.auth;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.annotation.JsonNaming;
 
-@Getter
-@Setter
+@Data
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class RegisterRequestDto {
 
     @NotBlank(message = "AUTH_0003")
@@ -17,7 +18,7 @@ public class RegisterRequestDto {
     @NotBlank(message = "AUTH_0003")
     @Size(max = 20, message = "AUTH_0003")
     @Pattern(regexp = "^\\+[1-9]\\d{1,14}$", message = "AUTH_0005")
-    private String phone;
+    private String phoneNumber;
 
     @Size(max = 100, message = "AUTH_0003")
     private String email;

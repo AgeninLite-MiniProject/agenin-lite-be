@@ -11,4 +11,6 @@ public class LoginResponseDto {
     private String accessToken;
     private String refreshToken;
     private String tokenType;
+    private Integer expiresIn;
+    private String role;
 }

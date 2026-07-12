@@ -1,10 +1,7 @@
-package com.indivaragroup.ageninlite.controller;
+package com.indivaragroup.ageninlite.controller.auth;
 
 import com.indivaragroup.ageninlite.common.dto.ApiResponse;
-import com.indivaragroup.ageninlite.dto.auth.LoginRequestDto;
-import com.indivaragroup.ageninlite.dto.auth.LoginResponseDto;
-import com.indivaragroup.ageninlite.dto.auth.RegisterRequestDto;
-import com.indivaragroup.ageninlite.dto.auth.RegisterResponseDto;
+import com.indivaragroup.ageninlite.dto.auth.*;
 import com.indivaragroup.ageninlite.service.auth.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,5 +32,10 @@ public class AuthController {
         return new ResponseEntity<>(
                 new ApiResponse<>(true, "Login Successfull", response), HttpStatus.OK
         );
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshResponseDto> refresh(@Valid @RequestBody RefreshRequestDto request) {
+        return ResponseEntity.ok(authService.refresh(request));
     }
 }

@@ -1,20 +1,22 @@
 package com.indivaragroup.ageninlite.dto.auth;
 
 import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.annotation.JsonNaming;
 
 import java.util.UUID;
 
-@Getter
-@Setter
+@Data
 @Builder
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class RegisterResponseDto {
-    private UUID id;
+    private UUID userId;
     private String name;
-    private String phone;
-    private String email;
+    private String phoneNumber;
     private String referralCode;
-    private String status;
+    private UUID referredBy;
+    private String role;
+    private String userStatus;
     private String message;
 }

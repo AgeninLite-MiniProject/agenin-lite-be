@@ -23,6 +23,11 @@ public enum AuthErrorCode implements ErrorCode {
     AUTH_0010("Invalid phone number and/or password", HttpStatus.UNAUTHORIZED), // 401
     AUTH_0011("Account has been deleted", HttpStatus.FORBIDDEN), // 403
 
+    // --- Authorization & Token Errors ---
+    AUTH_0020("Unauthorized - invalid or expired token", HttpStatus.UNAUTHORIZED), // 401
+    AUTH_0030("Refresh token is invalid, expired, or revoked", HttpStatus.UNAUTHORIZED), // 401
+    AUTH_0040("Unauthorized - Token has been blacklisted", HttpStatus.UNAUTHORIZED), // 401
+
     // --- General Auth Error ---
     AUTH_9999("Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR); // 500
 
