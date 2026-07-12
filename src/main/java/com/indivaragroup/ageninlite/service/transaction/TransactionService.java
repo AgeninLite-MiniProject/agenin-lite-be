@@ -16,6 +16,7 @@ import com.indivaragroup.ageninlite.repository.transaction.TrxCommissionReposito
 import com.indivaragroup.ageninlite.repository.transaction.TrxItemRepository;
 import com.indivaragroup.ageninlite.repository.transaction.TrxTransactionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,7 @@ import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TransactionService {
@@ -44,6 +46,7 @@ public class TransactionService {
 
     @Transactional
     public CompleteTransactionResponse completeTransaction(UUID requesterId, UUID trxId) {
+        log.info("completeTransaction started trxId={} requesterId={}", trxId, requesterId);
 
         //find transaction by id
         TrxTransaction trx = trxTransactionRepository.findById(trxId)
@@ -155,6 +158,7 @@ public class TransactionService {
         try {
             trxCommissionRepository.saveAll(commissionsToSave);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.warn("TRX_9999 commission integrity violation trxId={}", trxId, e);
             throw new AppException(TransactionErrorCode.TRX_9999);
         }
 
@@ -163,6 +167,7 @@ public class TransactionService {
         TrxTransaction savedTrx = trxTransactionRepository.save(trx);
 
         if (isFirstCompletion) {
+            log.info("seller activated on first completion sellerId={} trxId={}", seller.getUserId(), trxId);
             seller.setUserStatus(USER_STATUS_ACTIVE);
             userRepository.save(seller);
         }
@@ -173,6 +178,7 @@ public class TransactionService {
         //       entityType="TRX_COMMISSION", entityId=commissionId,
         //       payload={ beneficiaryId, type, amount }
 
+        log.info("completeTransaction succeeded trxId={} commissionsCreated={}", savedTrx.getTrxId(), totalRowsCreated);
         return CompleteTransactionResponse.builder()
                 .transactionId(savedTrx.getTrxId())
                 .trxStatus(savedTrx.getTrxStatus())
@@ -198,6 +204,7 @@ public class TransactionService {
     }
 
     public CreateTransactionResponse createTransaction(UUID sellerId, CreateTransactionRequest request) {
+        log.info("createTransaction started sellerId={} itemCount={}", sellerId, request.getItems().size());
 
         // === Step 2: duplicate productId check (Set-based; rejects, doesn't sum) ===
         Set<UUID> seenProductIds = new HashSet<>();
@@ -295,6 +302,7 @@ public class TransactionService {
                         })
                         .toList();
 
+        log.info("createTransaction succeeded trxId={} sellerId={} totalAmount={} totalProfit={}", trxId, sellerId, savedHeader.getTotalAmount(), savedHeader.getTotalProfit());
         return CreateTransactionResponse.builder()
                 .trxId(trxId)
                 .userId(sellerId)
