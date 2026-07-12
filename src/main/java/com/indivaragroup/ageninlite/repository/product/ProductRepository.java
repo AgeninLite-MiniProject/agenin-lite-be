@@ -8,4 +8,5 @@ import java.util.UUID;
 
 @Repository
 public interface ProductRepository extends JpaRepository<MstProduct, UUID> {
+    long countByProductStatus(String productStatus);
 }

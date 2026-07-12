@@ -73,7 +73,10 @@ class ProductServiceTest {
     void updateProduct_Success_AllFields() {
         ProductUpdateRequestDto request = new ProductUpdateRequestDto();
         request.setProduct_name("Kopi ABC");
+        request.setCost_price(new BigDecimal("45000.00"));
         request.setSelling_price(new BigDecimal("55000.00"));
+        request.setAgent_fee(new BigDecimal("15.00"));
+        request.setSuper_agent_fee(new BigDecimal("7.00"));
         request.setProduct_status("INACTIVE");
 
         when(productRepository.findById(productId)).thenReturn(Optional.of(mockProduct));
@@ -154,5 +157,71 @@ class ProductServiceTest {
         assertNotNull(responses);
         assertEquals(1, responses.size());
         assertEquals(productId, responses.get(0).getProduct_id());
+    }
+
+    @Test
+    void createProduct_ThrowsException_WhenSellingPriceLessThanCostPrice() {
+        ProductCreateRequestDto request = new ProductCreateRequestDto();
+        request.setProduct_name("Teh Pucuk");
+        request.setCost_price(new BigDecimal("50000.00"));
+        request.setSelling_price(new BigDecimal("40000.00"));
+        request.setAgent_fee(new BigDecimal("10.00"));
+        request.setSuper_agent_fee(new BigDecimal("5.00"));
+
+        AppException exception = assertThrows(AppException.class, () -> {
+            productService.createProduct(request);
+        });
+
+        assertEquals(ProductErrorCode.PRD_0009, exception.getErrorCode());
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void createProduct_ThrowsException_WhenTotalFeeExceeds100() {
+        ProductCreateRequestDto request = new ProductCreateRequestDto();
+        request.setProduct_name("Teh Pucuk");
+        request.setCost_price(new BigDecimal("40000.00"));
+        request.setSelling_price(new BigDecimal("50000.00"));
+        request.setAgent_fee(new BigDecimal("60.00"));
+        request.setSuper_agent_fee(new BigDecimal("50.00"));
+
+        AppException exception = assertThrows(AppException.class, () -> {
+            productService.createProduct(request);
+        });
+
+        assertEquals(ProductErrorCode.PRD_0010, exception.getErrorCode());
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void updateProduct_ThrowsException_WhenSellingPriceLessThanCostPrice() {
+        ProductUpdateRequestDto request = new ProductUpdateRequestDto();
+        request.setCost_price(new BigDecimal("50000.00"));
+        request.setSelling_price(new BigDecimal("40000.00"));
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(mockProduct));
+
+        AppException exception = assertThrows(AppException.class, () -> {
+            productService.updateProduct(productId, request);
+        });
+
+        assertEquals(ProductErrorCode.PRD_0009, exception.getErrorCode());
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void updateProduct_ThrowsException_WhenTotalFeeExceeds100() {
+        ProductUpdateRequestDto request = new ProductUpdateRequestDto();
+        request.setAgent_fee(new BigDecimal("60.00"));
+        request.setSuper_agent_fee(new BigDecimal("50.00"));
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(mockProduct));
+
+        AppException exception = assertThrows(AppException.class, () -> {
+            productService.updateProduct(productId, request);
+        });
+
+        assertEquals(ProductErrorCode.PRD_0010, exception.getErrorCode());
+        verify(productRepository, never()).save(any());
     }
 }

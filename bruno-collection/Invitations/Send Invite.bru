@@ -1,0 +1,30 @@
+meta {
+  name: Send Invite
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/invitations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJhYWM1YjdmMS0yNmRhLTRiNzYtYWZmMS0yNjNlNDM4ZTc2YmUiLCJwaG9uZSI6Iis2MjgxMjMzMjE0NTQiLCJyb2xlIjoiQUdFTlQiLCJpYXQiOjE3ODM2NTYzODUsImV4cCI6MTc4MzY1NzI4NX0.6EYHVTfRkJtTzp6R78lroAdjOXuDdorzPp7FGhIr9aBht8XipRuLdF7JNr0JZfH6W4krZLzbQnMWK_tVz5MZkg
+}
+
+body:json {
+  { "inviteeId": "{{uuid}}" }
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+  uuidB: 6c94381f-db13-402a-aabc-0967cbaa3578
+  uuid: ddc38d73-8b3c-4db7-9d9a-913f4d2d4e13
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

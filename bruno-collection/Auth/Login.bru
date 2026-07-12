@@ -12,9 +12,13 @@ post {
 
 body:json {
   {
-    "phone": "+6281234567890",
-    "password": "password123"
+    "phone": "+628123322254",
+    "password": "password321"
   }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
 }
 
 script:post-response {
