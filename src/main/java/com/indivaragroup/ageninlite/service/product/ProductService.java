@@ -12,8 +12,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -26,6 +29,7 @@ public class ProductService {
     public ProductResponseDto createProduct(ProductCreateRequestDto request) {
         log.info("Process create product with name: {}", request.getProduct_name());
 
+        validatePricingAndFee(request.getCost_price(), request.getSelling_price(), request.getAgent_fee(), request.getSuper_agent_fee());
         MstProduct newProduct = MstProduct.builder()
                 .productName(request.getProduct_name())
                 .costPrice(request.getCost_price())
@@ -74,6 +78,9 @@ public class ProductService {
             product.setProductStatus(request.getProduct_status());
         }
 
+        validatePricingAndFee(product.getCostPrice(), product.getSellingPrice(), product.getAgentFee(),
+                product.getSuperAgentFee());
+
         MstProduct updatedProduct = productRepository.save(product);
 
         return ProductResponseDto.builder()
@@ -87,6 +94,7 @@ public class ProductService {
                 .message("Product updated successfully")
                 .build();
     }
+
     @Transactional
     public ProductResponseDto setProductInactive(UUID productId) {
         log.info("Process set inactive for product with ID: {}", productId);
@@ -125,5 +133,17 @@ public class ProductService {
                         .message("Success")
                         .build())
                 .toList();
+    }
+
+    private void validatePricingAndFee(BigDecimal costPrice, BigDecimal sellingPrice, BigDecimal agentFee,
+            BigDecimal superAgentFee) {
+        if (sellingPrice.compareTo(costPrice) <= 0) {
+            throw new AppException(ProductErrorCode.PRD_0009);
+        }
+
+        BigDecimal totalFee = agentFee.add(superAgentFee);
+        if (totalFee.compareTo(new BigDecimal("100.00")) > 0) {
+            throw new AppException(ProductErrorCode.PRD_0010);
+        }
     }
 }
