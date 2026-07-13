@@ -1,0 +1,25 @@
+meta {
+  name: 11 Logout Negative Invalid Token
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{base_url}}/api/auth/logout
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: invalid_access_token
+}
+
+body:json {
+  {
+    "refresh_token": "invalid_refresh_token"
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+}

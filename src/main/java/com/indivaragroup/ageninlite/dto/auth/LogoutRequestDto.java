@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class LogoutRequestDto {
 
-    @NotBlank(message = "AUTH_0030")
+    @NotBlank(message = "AUTH_0031")
     @JsonProperty("refresh_token")
     private String refreshToken;
 

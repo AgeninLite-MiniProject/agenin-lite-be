@@ -1,0 +1,32 @@
+meta {
+  name: 10 Logout Happy Path
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{base_url}}/api/auth/logout
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+body:json {
+  {
+    "refresh_token": "{{refresh_token}}"
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setEnvVar("jwt_token", "");
+    bru.setEnvVar("refresh_token", "");
+  }
+}

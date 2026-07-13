@@ -21,8 +21,8 @@ vars:pre-request {
 }
 
 script:post-response {
-  if (res.body && res.body.data && res.body.data.accessToken) {
-    bru.setEnvVar("jwt_token", res.body.data.accessToken);
-    bru.setEnvVar("refresh_token", res.body.data.refreshToken);
+  if (res.body && res.body.access_token) {
+    bru.setEnvVar("jwt_token", res.body.access_token);
+    bru.setEnvVar("refresh_token", res.body.refresh_token);
   }
 }

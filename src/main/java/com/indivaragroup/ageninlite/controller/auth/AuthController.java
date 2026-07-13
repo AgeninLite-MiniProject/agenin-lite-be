@@ -1,6 +1,5 @@
 package com.indivaragroup.ageninlite.controller.auth;
 
-import com.indivaragroup.ageninlite.common.dto.ApiResponse;
 import com.indivaragroup.ageninlite.dto.auth.*;
 import com.indivaragroup.ageninlite.service.auth.AuthService;
 import jakarta.validation.Valid;
@@ -33,7 +32,11 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<LogoutResponseDto> logout(@RequestHeader("Authorization") String authHeader, @Valid @RequestBody LogoutRequestDto request) {
+    public ResponseEntity<LogoutResponseDto> logout(@RequestHeader(value = "Authorization", required = false) String authHeader, @Valid @RequestBody LogoutRequestDto request) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new com.indivaragroup.ageninlite.common.exception.AppException(com.indivaragroup.ageninlite.common.exception.code.AuthErrorCode.AUTH_0020);
+        }
 
         String accessToken = authHeader.substring(7);
         authService.logout(accessToken, request);
