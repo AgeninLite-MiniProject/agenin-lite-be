@@ -25,7 +25,13 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class InvitationServiceTest {
@@ -395,5 +401,199 @@ class InvitationServiceTest {
         AppException ex = assertThrows(AppException.class, () -> invitationService.cancelInvitation(inviterId, inviteeId));
         assertEquals(InvitationErrorCode.INV_0011, ex.getErrorCode());
         verify(invitationRepository, never()).save(any());
+    }
+
+    // ==================== Group 5: listSentInvitations() ====================
+
+    @Test
+    void listSent_WhenHappyPath_ShouldReturnItemsWithInviteeNames() {
+        TrxInvitation sent = buildInvitation("PENDING");
+        when(invitationRepository.findByInviterIdAndInvitationStatus(eq(inviterId), eq("PENDING"), any())).thenReturn(pageOf(sent));
+        when(userRepository.findAllById(any())).thenReturn(List.of(invitee));
+        when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
+
+        var result = invitationService.listSentInvitations(inviterId, "PENDING", 0, 10);
+
+        assertEquals(1, result.getInvitations().size());
+        assertEquals("Invitee Name", result.getInvitations().get(0).getInviteeName());
+        assertEquals("+628222", result.getInvitations().get(0).getInviteePhone());
+        assertEquals(0L, result.getPendingCount());
+        assertEquals(3, result.getPendingCap());
+    }
+
+    @Test
+    void listSent_WhenInviteeMissingInBatch_ShouldReturnNullNameAndPhone() {
+        TrxInvitation sent = buildInvitation("PENDING");
+        when(invitationRepository.findByInviterIdAndInvitationStatus(eq(inviterId), eq("PENDING"), any())).thenReturn(pageOf(sent));
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
+
+        var result = invitationService.listSentInvitations(inviterId, "PENDING", 0, 10);
+
+        assertNull(result.getInvitations().get(0).getInviteeName());
+        assertNull(result.getInvitations().get(0).getInviteePhone());
+    }
+
+    @Test
+    void listSent_WhenStatusNull_ShouldDefaultToPending() {
+        when(invitationRepository.findByInviterIdAndInvitationStatus(eq(inviterId), eq("PENDING"), any())).thenReturn(pageOf());
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
+
+        var result = invitationService.listSentInvitations(inviterId, null, 0, 10);
+
+        assertNotNull(result);
+        verify(invitationRepository).findByInviterIdAndInvitationStatus(eq(inviterId), eq("PENDING"), any());
+    }
+
+    @Test
+    void listSent_WhenStatusBlank_ShouldDefaultToPending() {
+        when(invitationRepository.findByInviterIdAndInvitationStatus(eq(inviterId), eq("PENDING"), any())).thenReturn(pageOf());
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
+
+        var result = invitationService.listSentInvitations(inviterId, "   ", 0, 10);
+
+        assertNotNull(result);
+        verify(invitationRepository).findByInviterIdAndInvitationStatus(eq(inviterId), eq("PENDING"), any());
+    }
+
+    @Test
+    void listSent_WhenSizeExceeds50_ShouldThrowInv0020() {
+        AppException ex = assertThrows(AppException.class,
+                () -> invitationService.listSentInvitations(inviterId, "PENDING", 0, 51));
+        assertEquals(InvitationErrorCode.INV_0020, ex.getErrorCode());
+        verify(invitationRepository, never()).findByInviterIdAndInvitationStatus(any(), any(), any());
+    }
+
+    @Test
+    void listSent_WhenSizeIsZeroOrNegative_ShouldNormalizeTo10() {
+        when(invitationRepository.findByInviterIdAndInvitationStatus(eq(inviterId), eq("PENDING"), any())).thenReturn(pageOf());
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
+
+        var result0 = invitationService.listSentInvitations(inviterId, "PENDING", 0, 0);
+        assertNotNull(result0);
+
+        var resultNeg = invitationService.listSentInvitations(inviterId, "PENDING", 0, -5);
+        assertNotNull(resultNeg);
+    }
+
+    @Test
+    void listSent_WhenPageIsNegative_ShouldNormalizeTo0() {
+        when(invitationRepository.findByInviterIdAndInvitationStatus(eq(inviterId), eq("PENDING"), any())).thenReturn(pageOf());
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
+
+        var result = invitationService.listSentInvitations(inviterId, "PENDING", -3, 10);
+
+        assertNotNull(result);
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(invitationRepository).findByInviterIdAndInvitationStatus(eq(inviterId), eq("PENDING"), pageableCaptor.capture());
+        assertEquals(0, pageableCaptor.getValue().getPageNumber());
+    }
+
+    // ==================== Group 6: listReceivedInvitations() ====================
+
+    @Test
+    void listReceived_WhenHappyPath_ShouldReturnItemsWithInviterNames() {
+        TrxInvitation received = TrxInvitation.builder()
+                .invitationId(UUID.randomUUID())
+                .inviterId(inviterId)
+                .inviteeId(inviteeId)
+                .invitationStatus("PENDING")
+                .build();
+        when(invitationRepository.findByInviteeIdAndInvitationStatus(eq(inviteeId), eq("PENDING"), any())).thenReturn(pageOf(received));
+        when(userRepository.findAllById(any())).thenReturn(List.of(inviter));
+        when(invitationRepository.countByInviteeIdAndInvitationStatus(inviteeId, "PENDING")).thenReturn(0L);
+
+        var result = invitationService.listReceivedInvitations(inviteeId, "PENDING", 0, 10);
+
+        assertEquals(1, result.getInvitations().size());
+        assertEquals("Inviter Name", result.getInvitations().get(0).getInviterName());
+        assertEquals("+628111", result.getInvitations().get(0).getInviterPhone());
+        assertEquals(0L, result.getPendingCount());
+    }
+
+    @Test
+    void listReceived_WhenInviterMissingInBatch_ShouldReturnNullNameAndPhone() {
+        TrxInvitation received = TrxInvitation.builder()
+                .invitationId(UUID.randomUUID())
+                .inviterId(inviterId)
+                .inviteeId(inviteeId)
+                .invitationStatus("PENDING")
+                .build();
+        when(invitationRepository.findByInviteeIdAndInvitationStatus(eq(inviteeId), eq("PENDING"), any())).thenReturn(pageOf(received));
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(invitationRepository.countByInviteeIdAndInvitationStatus(inviteeId, "PENDING")).thenReturn(0L);
+
+        var result = invitationService.listReceivedInvitations(inviteeId, "PENDING", 0, 10);
+
+        assertNull(result.getInvitations().get(0).getInviterName());
+        assertNull(result.getInvitations().get(0).getInviterPhone());
+    }
+
+    @Test
+    void listReceived_WhenStatusNull_ShouldDefaultToPending() {
+        when(invitationRepository.findByInviteeIdAndInvitationStatus(eq(inviteeId), eq("PENDING"), any())).thenReturn(pageOf());
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(invitationRepository.countByInviteeIdAndInvitationStatus(inviteeId, "PENDING")).thenReturn(0L);
+
+        var result = invitationService.listReceivedInvitations(inviteeId, null, 0, 10);
+
+        assertNotNull(result);
+        verify(invitationRepository).findByInviteeIdAndInvitationStatus(eq(inviteeId), eq("PENDING"), any());
+    }
+
+    @Test
+    void listReceived_WhenStatusBlank_ShouldDefaultToPending() {
+        when(invitationRepository.findByInviteeIdAndInvitationStatus(eq(inviteeId), eq("PENDING"), any())).thenReturn(pageOf());
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(invitationRepository.countByInviteeIdAndInvitationStatus(inviteeId, "PENDING")).thenReturn(0L);
+
+        var result = invitationService.listReceivedInvitations(inviteeId, "", 0, 10);
+
+        assertNotNull(result);
+        verify(invitationRepository).findByInviteeIdAndInvitationStatus(eq(inviteeId), eq("PENDING"), any());
+    }
+
+    @Test
+    void listReceived_WhenSizeExceeds50_ShouldThrowInv0020() {
+        AppException ex = assertThrows(AppException.class,
+                () -> invitationService.listReceivedInvitations(inviteeId, "PENDING", 0, 51));
+        assertEquals(InvitationErrorCode.INV_0020, ex.getErrorCode());
+        verify(invitationRepository, never()).findByInviteeIdAndInvitationStatus(any(), any(), any());
+    }
+
+    @Test
+    void listReceived_WhenSizeIsZeroOrNegative_ShouldNormalizeTo10() {
+        when(invitationRepository.findByInviteeIdAndInvitationStatus(eq(inviteeId), eq("PENDING"), any())).thenReturn(pageOf());
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(invitationRepository.countByInviteeIdAndInvitationStatus(inviteeId, "PENDING")).thenReturn(0L);
+
+        assertNotNull(invitationService.listReceivedInvitations(inviteeId, "PENDING", 0, 0));
+        assertNotNull(invitationService.listReceivedInvitations(inviteeId, "PENDING", 0, -5));
+    }
+
+    @Test
+    void listReceived_WhenPageIsNegative_ShouldNormalizeTo0() {
+        when(invitationRepository.findByInviteeIdAndInvitationStatus(eq(inviteeId), eq("PENDING"), any())).thenReturn(pageOf());
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(invitationRepository.countByInviteeIdAndInvitationStatus(inviteeId, "PENDING")).thenReturn(0L);
+
+        var result = invitationService.listReceivedInvitations(inviteeId, "PENDING", -2, 10);
+
+        assertNotNull(result);
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(invitationRepository).findByInviteeIdAndInvitationStatus(eq(inviteeId), eq("PENDING"), pageableCaptor.capture());
+        assertEquals(0, pageableCaptor.getValue().getPageNumber());
+    }
+
+    // ==================== Helper for Page<TrxInvitation> mocking ====================
+
+    private static Page<TrxInvitation> pageOf(TrxInvitation... items) {
+        java.util.List<TrxInvitation> list = items.length == 0 ? java.util.List.of() : java.util.Arrays.asList(items);
+        int pageSize = Math.max(items.length, 1);
+        return new PageImpl<>(list, PageRequest.of(0, pageSize), list.size());
     }
 }

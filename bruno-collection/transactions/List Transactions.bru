@@ -1,0 +1,24 @@
+meta {
+  name: List Transactions
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/transactions?role=SELLER&page=0&size=20
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbG...LOyg
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

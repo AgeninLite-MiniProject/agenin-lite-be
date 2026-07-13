@@ -21,6 +21,12 @@ public enum TransactionErrorCode implements ErrorCode {
     TRX_0012("You can only complete your own transactions", HttpStatus.FORBIDDEN),   // 403
     TRX_0013("Product is no longer active",                 HttpStatus.BAD_REQUEST), // 400
 
+    // === View Transaction (TRX_0014) ===
+    TRX_0014("You can only view your own transactions",         HttpStatus.FORBIDDEN),    // 403
+
+    // === List Transaction validation (TRX_0015) ===
+    TRX_0015("Invalid view mode, must be SELLER or BENEFICIARY", HttpStatus.BAD_REQUEST), // 400
+
     // === Catch-all ===
     TRX_9999("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR); // 500
 
