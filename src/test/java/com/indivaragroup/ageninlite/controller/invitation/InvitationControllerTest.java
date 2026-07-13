@@ -8,7 +8,9 @@ import com.indivaragroup.ageninlite.dto.invitation.AcceptInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.CancelInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.DeclineInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.InvitationResponse;
+import com.indivaragroup.ageninlite.dto.invitation.ReceivedInvitationListResponse;
 import com.indivaragroup.ageninlite.dto.invitation.SendInvitationRequest;
+import com.indivaragroup.ageninlite.dto.invitation.SentInvitationListResponse;
 import com.indivaragroup.ageninlite.service.invitation.InvitationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,13 +29,16 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -80,6 +85,16 @@ class InvitationControllerTest {
         SecurityContextHolder.clearContext();
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 newPrincipal.toString(),
+                null,
+                Collections.singleton(new SimpleGrantedAuthority("ROLE_AGENT"))
+        );
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
+    private void setJwtPrincipal(String rawPrincipal) {
+        SecurityContextHolder.clearContext();
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                rawPrincipal,
                 null,
                 Collections.singleton(new SimpleGrantedAuthority("ROLE_AGENT"))
         );
@@ -295,5 +310,129 @@ class InvitationControllerTest {
         mockMvc.perform(post("/api/invitations/not-a-uuid/cancel"))
                 .andExpect(status().isBadRequest());
         verify(invitationService, never()).cancelInvitation(any(), any());
+    }
+
+    // ===== Group 5: listSent (GET /api/invitations/sent) =====
+
+    @Test
+    void listSent_WithDefaultQueryParams_ShouldReturn200WithBody() throws Exception {
+        SentInvitationListResponse response = SentInvitationListResponse.builder()
+                .invitations(List.of())
+                .pendingCount(0L)
+                .pendingCap(3)
+                .build();
+        when(invitationService.listSentInvitations(eq(inviterId), eq("PENDING"), eq(0), eq(10)))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/invitations/sent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Sent invitations fetched"))
+                .andExpect(jsonPath("$.data.pendingCount").value(0))
+                .andExpect(jsonPath("$.data.pendingCap").value(3));
+    }
+
+    @Test
+    void listSent_WhenSizeExceeds50_ShouldReturn400WithInv0020() throws Exception {
+        mockMvc.perform(get("/api/invitations/sent")
+                        .param("size", "51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("INV_0020: Page size must not exceed 50"));
+        verify(invitationService, never()).listSentInvitations(any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void listSent_WhenSizeIsZeroOrNegative_ShouldNormalizeAndStillCallService() throws Exception {
+        SentInvitationListResponse response = SentInvitationListResponse.builder()
+                .invitations(List.of())
+                .pendingCount(0L)
+                .pendingCap(3)
+                .build();
+        when(invitationService.listSentInvitations(eq(inviterId), eq("PENDING"), eq(0), eq(10)))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/invitations/sent")
+                        .param("size", "0"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listSent_WhenPageIsNegative_ShouldNormalizeTo0AndStillCallService() throws Exception {
+        SentInvitationListResponse response = SentInvitationListResponse.builder()
+                .invitations(List.of())
+                .pendingCount(0L)
+                .pendingCap(3)
+                .build();
+        when(invitationService.listSentInvitations(eq(inviterId), eq("PENDING"), eq(0), eq(10)))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/invitations/sent")
+                        .param("page", "-3"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listSent_WhenJwtPrincipalIsInvalidUuid_ShouldReturn400() throws Exception {
+        setJwtPrincipal("not-a-uuid");
+
+        mockMvc.perform(get("/api/invitations/sent"))
+                .andExpect(status().isBadRequest());
+        verify(invitationService, never()).listSentInvitations(any(), any(), anyInt(), anyInt());
+    }
+
+    // ===== Group 6: listReceived (GET /api/invitations/received) =====
+
+    @Test
+    void listReceived_WithDefaultQueryParams_ShouldReturn200WithBody() throws Exception {
+        ReceivedInvitationListResponse response = ReceivedInvitationListResponse.builder()
+                .invitations(List.of())
+                .pendingCount(0L)
+                .build();
+        when(invitationService.listReceivedInvitations(eq(inviteeId), eq("PENDING"), eq(0), eq(10)))
+                .thenReturn(response);
+
+        setJwtPrincipal(inviteeId);
+
+        mockMvc.perform(get("/api/invitations/received"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Received invitations fetched"))
+                .andExpect(jsonPath("$.data.pendingCount").value(0));
+    }
+
+    @Test
+    void listReceived_WhenSizeExceeds50_ShouldReturn400WithInv0020() throws Exception {
+        setJwtPrincipal(inviteeId);
+
+        mockMvc.perform(get("/api/invitations/received")
+                        .param("size", "51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("INV_0020: Page size must not exceed 50"));
+        verify(invitationService, never()).listReceivedInvitations(any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void listReceived_WhenSizeAndPageAreInvalid_ShouldNormalizeAndStillCallService() throws Exception {
+        setJwtPrincipal(inviteeId);
+        ReceivedInvitationListResponse response = ReceivedInvitationListResponse.builder()
+                .invitations(List.of())
+                .pendingCount(0L)
+                .build();
+        when(invitationService.listReceivedInvitations(eq(inviteeId), eq("PENDING"), eq(0), eq(10)))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/invitations/received")
+                        .param("size", "0")
+                        .param("page", "-1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listReceived_WhenJwtPrincipalIsInvalidUuid_ShouldReturn400() throws Exception {
+        setJwtPrincipal("not-a-uuid");
+
+        mockMvc.perform(get("/api/invitations/received"))
+                .andExpect(status().isBadRequest());
+        verify(invitationService, never()).listReceivedInvitations(any(), any(), anyInt(), anyInt());
     }
 }
