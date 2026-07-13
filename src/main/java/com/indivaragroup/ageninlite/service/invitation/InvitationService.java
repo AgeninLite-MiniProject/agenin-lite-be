@@ -51,13 +51,20 @@ public class InvitationService {
 
     @Transactional
     public InvitationResponse sendInvitation(UUID inviterId, SendInvitationRequest request) {
-        UUID inviteeId = request.getInviteeId();
+        String e164 = normalizeToE164(request.getPhoneNumber());
+
+        MstUser invitee = userRepository.findByPhoneNumber(e164)
+                .orElseThrow(() -> new AppException(InvitationErrorCode.INV_0023));
+
+        if (invitee.isDeleted()) {
+            throw new AppException(InvitationErrorCode.INV_0007);
+        }
+
+        UUID inviteeId = invitee.getUserId();
 
         if (inviterId.equals(inviteeId)) {
             throw new AppException(InvitationErrorCode.INV_0001);
         }
-
-        MstUser invitee = findActiveInviteeOrThrow(inviteeId);
 
         if (invitee.getReferredBy() != null) {
             throw new AppException(InvitationErrorCode.INV_0004);
@@ -325,5 +332,30 @@ public class InvitationService {
                 .createdAt(saved.getCreatedAt())
                 .message("Invitation sent successfully")
                 .build();
+    }
+
+    private String normalizeToE164(String raw) {
+        if (raw == null) {
+            throw new AppException(InvitationErrorCode.INV_0022);
+        }
+
+        String digits = raw.replaceAll("[\\s\\-\\.\\(\\)]", "");
+
+        if (!digits.matches("^\\+?\\d{6,15}$")) {
+            throw new AppException(InvitationErrorCode.INV_0022);
+        }
+
+        if (digits.startsWith("+")) {
+            return digits;
+        }
+
+        if (digits.startsWith("62")) {
+            return "+" + digits;
+        }
+
+        if (digits.startsWith("0")) {
+            return "+62" + digits.substring(1);
+        }
+        throw new AppException(InvitationErrorCode.INV_0022);
     }
 }
