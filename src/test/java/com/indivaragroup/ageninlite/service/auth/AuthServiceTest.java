@@ -562,7 +562,7 @@ class AuthServiceTest {
 
         authService.logout(accessToken, request);
 
-        verify(jwtBlacklistRepository).save(any(AuthJwtBlacklist.class));
+        verify(jwtBlacklistRepository).saveAndFlush(any(AuthJwtBlacklist.class));
         verify(refreshTokenRepository).delete(storedToken);
     }
 
@@ -592,7 +592,7 @@ class AuthServiceTest {
 
         authService.logout(accessToken, request);
 
-        verify(jwtBlacklistRepository).save(any(AuthJwtBlacklist.class));
+        verify(jwtBlacklistRepository).saveAndFlush(any(AuthJwtBlacklist.class));
         verify(refreshTokenRepository, never()).delete(any());
     }
 

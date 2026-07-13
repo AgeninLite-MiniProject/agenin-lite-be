@@ -249,37 +249,47 @@ public class AuthService {
     public void logout(String accessToken, LogoutRequestDto request) {
         // 1. ekstrak access token
         Claims accessClaims;
+        UUID jti;
+        UUID accessUserId;
+        LocalDateTime accessExp;
         try {
             accessClaims = jwtUtil.extractAllClaims(accessToken);
             if (!"access".equals(accessClaims.get("type", String.class))) {
                 throw new AppException(AuthErrorCode.AUTH_0020);
             }
+            jti = UUID.fromString(accessClaims.getId());
+            accessUserId = UUID.fromString(accessClaims.getSubject());
+            accessExp = accessClaims.getExpiration()
+                    .toInstant()
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDateTime();
+        } catch (AppException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("Logout failed: Access token invalid!");
+            log.error("Logout failed: Access token invalid or missing claims", e);
             throw new AppException(AuthErrorCode.AUTH_0020);
         }
 
-        UUID jti = UUID.fromString(accessClaims.getId());
-        UUID accessUserId = UUID.fromString(accessClaims.getSubject());
-        LocalDateTime accessExp = accessClaims.getExpiration()
-                .toInstant()
-                .atZone(ZoneId.systemDefault())
-                .toLocalDateTime();
-
         // 2. ekstrak refresh token
         Claims refreshClaims;
+        UUID refreshUserId;
+        String tokenIdStr;
         try {
             refreshClaims = jwtUtil.extractAllClaims(request.getRefreshToken());
             if (!"refresh".equals(refreshClaims.get("type", String.class))) {
                 throw new AppException(AuthErrorCode.AUTH_0031);
             }
+            refreshUserId = UUID.fromString(refreshClaims.getSubject());
+            tokenIdStr = refreshClaims.get("tokenId", String.class);
+            if (tokenIdStr == null) {
+                throw new AppException(AuthErrorCode.AUTH_0031);
+            }
+        } catch (AppException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("Logout failed: Refresh token invalid", e);
+            log.error("Logout failed: Refresh token invalid or missing claims", e);
             throw new AppException(AuthErrorCode.AUTH_0031);
         }
-
-        UUID refreshUserId = UUID.fromString(refreshClaims.getSubject());
-        String tokenIdStr = refreshClaims.get("tokenId", String.class);
 
         // 3. cross-check subject
         if (!accessUserId.equals(refreshUserId)) {
@@ -288,13 +298,17 @@ public class AuthService {
         }
 
         // 4. blacklist access token
-        AuthJwtBlacklist jwtBlacklist = AuthJwtBlacklist.builder()
-                .tokenJti(jti)
-                .userId(accessUserId)
-                .expiresAt(accessExp)
-                .build();
+        try {
+            AuthJwtBlacklist jwtBlacklist = AuthJwtBlacklist.builder()
+                    .tokenJti(jti)
+                    .userId(accessUserId)
+                    .expiresAt(accessExp)
+                    .build();
 
-        jwtBlacklistRepository.save(jwtBlacklist);
+            jwtBlacklistRepository.saveAndFlush(jwtBlacklist);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.warn("Logout idempotent: access token {} already blacklisted", jti);
+        }
 
         // 5. hapus refresh token
         refreshTokenRepository.findByTokenId(tokenIdStr)

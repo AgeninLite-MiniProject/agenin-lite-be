@@ -225,6 +225,6 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/logout")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(jsonRequest))
-                .andExpect(status().isBadRequest()); // Missing @RequestHeader
+                .andExpect(status().isUnauthorized()); // Missing @RequestHeader now throws AUTH_0020
     }
 }
