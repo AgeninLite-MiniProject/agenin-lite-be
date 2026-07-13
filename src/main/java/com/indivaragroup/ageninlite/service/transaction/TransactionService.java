@@ -35,6 +35,7 @@ public class TransactionService {
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_COMPLETED = "COMPLETED";
     private static final String STATUS_CANCELLED = "CANCELLED";
+    private static final String STATUS_FAILED = "FAILED";
     private static final String USER_STATUS_PASSIVE = "PASSIVE";
     private static final String USER_STATUS_ACTIVE = "ACTIVE";
     private static final String COMMISSION_TYPE_AGENT = "AGENT_FEE";
@@ -216,6 +217,31 @@ public class TransactionService {
                 .trxId(trxId)
                 .trxStatus(STATUS_CANCELLED)
                 .message("Transaction cancelled")
+                .build();
+    }
+
+    @Transactional
+    public TransactionStatusUpdateResponse failTransaction(UUID requesterId, UUID trxId) {
+        TrxTransaction trx = trxTransactionRepository.findById(trxId)
+                .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
+
+        if (!trx.getUserId().equals(requesterId)) {
+            throw new AppException(TransactionErrorCode.TRX_0012);
+        }
+
+        if (!STATUS_PENDING.equals(trx.getTrxStatus())) {
+            throw new AppException(TransactionErrorCode.TRX_0011);
+        }
+
+        trx.setTrxStatus(STATUS_FAILED);
+        trxTransactionRepository.save(trx);
+
+        log.info("transaction failed trxId={} requesterId={}", trxId, requesterId);
+
+        return TransactionStatusUpdateResponse.builder()
+                .trxId(trxId)
+                .trxStatus(STATUS_FAILED)
+                .message("Transaction failed")
                 .build();
     }
 

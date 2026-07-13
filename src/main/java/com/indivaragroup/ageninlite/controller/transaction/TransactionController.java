@@ -57,4 +57,14 @@ public class TransactionController {
         TransactionStatusUpdateResponse response = transactionService.cancelTransaction(requesterUuid, id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Transaction cancelled", response));
     }
+
+    @PostMapping("/{id}/fail")
+    public ResponseEntity<ApiResponse<TransactionStatusUpdateResponse>> fail(
+            @AuthenticationPrincipal String requesterId,
+            @PathVariable UUID id) {
+
+        UUID requesterUuid = UUID.fromString(requesterId);
+        TransactionStatusUpdateResponse response = transactionService.failTransaction(requesterUuid, id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Transaction failed", response));
+    }
 }
