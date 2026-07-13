@@ -5,6 +5,9 @@ import com.indivaragroup.ageninlite.common.exception.code.TransactionErrorCode;
 import com.indivaragroup.ageninlite.dto.transaction.CompleteTransactionResponse;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionRequest;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionDetailResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionListItemDto;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionListResponse;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionStatusUpdateResponse;
 import com.indivaragroup.ageninlite.entity.MstProduct;
 import com.indivaragroup.ageninlite.entity.MstUser;
@@ -18,6 +21,10 @@ import com.indivaragroup.ageninlite.repository.transaction.TrxItemRepository;
 import com.indivaragroup.ageninlite.repository.transaction.TrxTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +39,10 @@ import java.util.stream.Collectors;
 public class TransactionService {
 
     private static final int MAX_QUANTITY_PER_LINE = 100_000;
+    private static final String ROLE_SELLER = "SELLER";
+    private static final String ROLE_BENEFICIARY = "BENEFICIARY";
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final int DEFAULT_PAGE_SIZE = 20;
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_COMPLETED = "COMPLETED";
     private static final String STATUS_CANCELLED = "CANCELLED";
@@ -242,6 +253,184 @@ public class TransactionService {
                 .trxId(trxId)
                 .trxStatus(STATUS_FAILED)
                 .message("Transaction failed")
+                .build();
+    }
+
+    private TransactionListItemDto buildListItem(TrxTransaction trx, UUID viewerId, String viewerRole) {
+        List<TrxItem> items = trxItemRepository.findByTrxId(trx.getTrxId());
+        if (items.isEmpty()) {
+            return TransactionListItemDto.builder()
+                    .id(trx.getTrxId())
+                    .amount(trx.getTotalAmount())
+                    .profit(trx.getTotalProfit())
+                    .status(trx.getTrxStatus())
+                    .createdAt(trx.getCreatedAt())
+                    .completedAt(trx.getCompletedAt())
+                    .agentFeeAmount(BigDecimal.ZERO)
+                    .superAgentFeeAmount(BigDecimal.ZERO)
+                    .build();
+        }
+
+        List<UUID> productIds = items.stream()
+                .map(TrxItem::getProductId)
+                .distinct()
+                .toList();
+        Map<UUID, MstProduct> productById = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(MstProduct::getProductId, p -> p));
+
+        TrxItem firstItem = items.get(0);
+        MstProduct firstProduct = productById.get(firstItem.getProductId());
+
+        List<UUID> itemIds = items.stream().map(TrxItem::getItemId).toList();
+        List<TrxCommission> commissions = trxCommissionRepository.findAllByItemIdIn(itemIds);
+
+        BigDecimal agentFeeAmount = commissions.stream()
+                .filter(c -> COMMISSION_TYPE_AGENT.equals(c.getCommissionType()))
+                .filter(c -> ROLE_SELLER.equals(viewerRole)
+                        ? viewerId.equals(c.getSourceUserId())
+                        : viewerId.equals(c.getBeneficiaryId()))
+                .map(TrxCommission::getCommissionAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal superAgentFeeAmount = commissions.stream()
+                .filter(c -> COMMISSION_TYPE_SUPER_AGENT.equals(c.getCommissionType()))
+                .filter(c -> ROLE_SELLER.equals(viewerRole)
+                        ? viewerId.equals(c.getSourceUserId())
+                        : viewerId.equals(c.getBeneficiaryId()))
+                .map(TrxCommission::getCommissionAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return TransactionListItemDto.builder()
+                .id(trx.getTrxId())
+                .productId(firstItem.getProductId())
+                .productName(firstProduct != null ? firstProduct.getProductName() : null)
+                .quantity(firstItem.getQuantity())
+                .amount(trx.getTotalAmount())
+                .profit(trx.getTotalProfit())
+                .agentFeeAmount(agentFeeAmount)
+                .superAgentFeeAmount(superAgentFeeAmount)
+                .status(trx.getTrxStatus())
+                .createdAt(trx.getCreatedAt())
+                .completedAt(trx.getCompletedAt())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public TransactionListResponse listTransactions(
+            UUID requesterId, String role, String status, int page, int size) {
+
+        String effectiveRole = (role == null || role.isBlank()) ? ROLE_SELLER : role.toUpperCase();
+        if (!ROLE_SELLER.equals(effectiveRole) && !ROLE_BENEFICIARY.equals(effectiveRole)) {
+            throw new AppException(TransactionErrorCode.TRX_0015);
+        }
+        if (size > MAX_PAGE_SIZE) {
+            throw new AppException(TransactionErrorCode.TRX_0015);
+        }
+        if (size <= 0) {
+            size = DEFAULT_PAGE_SIZE;
+        }
+        if (page < 0) {
+            page = 0;
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        Page<TrxTransaction> trxPage;
+        if (ROLE_SELLER.equals(effectiveRole)) {
+            trxPage = (status == null || status.isBlank())
+                    ? trxTransactionRepository.findByUserId(requesterId, pageable)
+                    : trxTransactionRepository.findByUserIdAndTrxStatus(requesterId, status, pageable);
+        } else {
+            trxPage = trxTransactionRepository.findTransactionsBenefitingUser(requesterId, status, pageable);
+        }
+
+        List<TransactionListItemDto> items = trxPage.getContent().stream()
+                .map(trx -> buildListItem(trx, requesterId, effectiveRole))
+                .toList();
+
+        BigDecimal totalAgentFee = trxCommissionRepository
+                .sumCommissionAmountByBeneficiaryIdAndCommissionType(requesterId, COMMISSION_TYPE_AGENT);
+        BigDecimal totalSuperAgentFee = trxCommissionRepository
+                .sumCommissionAmountByBeneficiaryIdAndCommissionType(requesterId, COMMISSION_TYPE_SUPER_AGENT);
+        BigDecimal totalCommission = (totalAgentFee != null ? totalAgentFee : BigDecimal.ZERO)
+                .add(totalSuperAgentFee != null ? totalSuperAgentFee : BigDecimal.ZERO);
+
+        long completedCount;
+        if (ROLE_SELLER.equals(effectiveRole)) {
+            completedCount = trxPage.getTotalElements() > 0
+                    ? trxTransactionRepository.findByUserIdAndTrxStatus(requesterId, "COMPLETED",
+                            PageRequest.of(0, 1)).getTotalElements()
+                    : 0L;
+        } else {
+            completedCount = trxTransactionRepository.countCompletedTransactionsBenefitingUser(requesterId);
+        }
+
+        return TransactionListResponse.builder()
+                .transactions(items)
+                .totalCommission(totalCommission)
+                .completedCount(completedCount)
+                .page(page)
+                .size(size)
+                .totalElements(trxPage.getTotalElements())
+                .totalPages(trxPage.getTotalPages())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public TransactionDetailResponse getTransactionDetail(UUID requesterId, UUID trxId) {
+        TrxTransaction trx = trxTransactionRepository.findById(trxId)
+                .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
+
+        boolean isSeller = trx.getUserId().equals(requesterId);
+        boolean isBeneficiary = !isSeller && trxCommissionRepository
+                .existsByBeneficiaryIdAndSourceUserId(requesterId, trx.getUserId());
+        if (!isSeller && !isBeneficiary) {
+            throw new AppException(TransactionErrorCode.TRX_0014);
+        }
+
+        TransactionListItemDto base = buildListItem(trx, requesterId, ROLE_SELLER);
+
+        MstUser seller = userRepository.findById(trx.getUserId())
+                .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
+
+        List<TrxItem> items = trxItemRepository.findByTrxId(trxId);
+        List<UUID> productIds = items.stream()
+                .map(TrxItem::getProductId)
+                .distinct()
+                .toList();
+        Map<UUID, MstProduct> productById = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(MstProduct::getProductId, p -> p));
+
+        List<CreateTransactionResponse.TransactionItemResponse> itemResponses = items.stream()
+                .map(item -> {
+                    MstProduct product = productById.get(item.getProductId());
+                    return CreateTransactionResponse.TransactionItemResponse.builder()
+                            .itemId(item.getItemId())
+                            .productId(item.getProductId())
+                            .productName(product != null ? product.getProductName() : null)
+                            .quantity(item.getQuantity())
+                            .itemAmount(item.getItemAmount())
+                            .profit(item.getProfit())
+                            .build();
+                })
+                .toList();
+
+        return TransactionDetailResponse.builder()
+                .id(base.getId())
+                .productId(base.getProductId())
+                .productName(base.getProductName())
+                .quantity(base.getQuantity())
+                .amount(base.getAmount())
+                .profit(base.getProfit())
+                .agentFeeAmount(base.getAgentFeeAmount())
+                .superAgentFeeAmount(base.getSuperAgentFeeAmount())
+                .status(base.getStatus())
+                .createdAt(base.getCreatedAt())
+                .completedAt(base.getCompletedAt())
+                .description(trx.getDescription())
+                .sellerId(trx.getUserId())
+                .sellerName(seller.getUserName())
+                .items(itemResponses)
                 .build();
     }
 
