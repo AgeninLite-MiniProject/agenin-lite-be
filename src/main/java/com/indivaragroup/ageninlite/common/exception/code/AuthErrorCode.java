@@ -26,6 +26,7 @@ public enum AuthErrorCode implements ErrorCode {
     // --- Authorization & Token Errors ---
     AUTH_0020("Unauthorized - invalid or expired token", HttpStatus.UNAUTHORIZED), // 401
     AUTH_0030("Refresh token is invalid, expired, or revoked", HttpStatus.UNAUTHORIZED), // 401
+    AUTH_0031("Invalid refresh token or subject mismatch", HttpStatus.BAD_REQUEST), // 400
     AUTH_0040("Unauthorized - Token has been blacklisted", HttpStatus.UNAUTHORIZED), // 401
 
     // --- General Auth Error ---

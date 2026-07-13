@@ -3,8 +3,10 @@ package com.indivaragroup.ageninlite.service.auth;
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.AuthErrorCode;
 import com.indivaragroup.ageninlite.dto.auth.*;
+import com.indivaragroup.ageninlite.entity.AuthJwtBlacklist;
 import com.indivaragroup.ageninlite.entity.AuthRefreshToken;
 import com.indivaragroup.ageninlite.entity.MstUser;
+import com.indivaragroup.ageninlite.repository.auth.JwtBlacklistRepository;
 import com.indivaragroup.ageninlite.repository.auth.RefreshTokenRepository;
 import com.indivaragroup.ageninlite.repository.auth.UserRepository;
 import com.indivaragroup.ageninlite.security.JwtUtil;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Slf4j
@@ -27,6 +30,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final JwtBlacklistRepository jwtBlacklistRepository;
 
     @Transactional
     public RegisterResponseDto register(RegisterRequestDto request) {
@@ -239,6 +243,62 @@ public class AuthService {
                 .tokenType("Bearer")
                 .expiresIn(900)
                 .build();
+    }
+
+    @Transactional
+    public void logout(String accessToken, LogoutRequestDto request) {
+        // 1. ekstrak access token
+        Claims accessClaims;
+        try {
+            accessClaims = jwtUtil.extractAllClaims(accessToken);
+            if (!"access".equals(accessClaims.get("type", String.class))) {
+                throw new AppException(AuthErrorCode.AUTH_0020);
+            }
+        } catch (Exception e) {
+            log.error("Logout failed: Access token invalid!");
+            throw new AppException(AuthErrorCode.AUTH_0020);
+        }
+
+        UUID jti = UUID.fromString(accessClaims.getId());
+        UUID accessUserId = UUID.fromString(accessClaims.getSubject());
+        LocalDateTime accessExp = accessClaims.getExpiration()
+                .toInstant()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDateTime();
+
+        // 2. ekstrak refresh token
+        Claims refreshClaims;
+        try {
+            refreshClaims = jwtUtil.extractAllClaims(request.getRefreshToken());
+            if (!"refresh".equals(refreshClaims.get("type", String.class))) {
+                throw new AppException(AuthErrorCode.AUTH_0031);
+            }
+        } catch (Exception e) {
+            log.error("Logout failed: Refresh token invalid", e);
+            throw new AppException(AuthErrorCode.AUTH_0031);
+        }
+
+        UUID refreshUserId = UUID.fromString(refreshClaims.getSubject());
+        String tokenIdStr = refreshClaims.get("tokenId", String.class);
+
+        // 3. cross-check subject
+        if (!accessUserId.equals(refreshUserId)) {
+            log.error("Logout failed: Subject mismatch between access and refresh token");
+            throw new AppException(AuthErrorCode.AUTH_0031);
+        }
+
+        // 4. blacklist access token
+        AuthJwtBlacklist jwtBlacklist = AuthJwtBlacklist.builder()
+                .tokenJti(jti)
+                .userId(accessUserId)
+                .expiresAt(accessExp)
+                .build();
+
+        jwtBlacklistRepository.save(jwtBlacklist);
+
+        // 5. hapus refresh token
+        refreshTokenRepository.findByTokenId(tokenIdStr)
+                .ifPresent(refreshTokenRepository::delete);
     }
 
     private String generateReferralCode() {

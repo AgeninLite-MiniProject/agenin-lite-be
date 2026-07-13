@@ -29,7 +29,9 @@ public class JwtUtil {
 
     public String generateToken(UUID userId, String phoneNumber, String role) {
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(userId.toString())
+                .claim("type", "access")
                 .claim("phone", phoneNumber)
                 .claim("role", role)
                 .issuedAt(new Date())
@@ -41,6 +43,7 @@ public class JwtUtil {
     public String generateRefreshToken(UUID userId, String tokenId) {
         return Jwts.builder()
                 .subject(userId.toString())
+                .claim("type", "refresh")
                 .claim("tokenId", tokenId)
                 .issuedAt(new Date())
                 .expiration(new Date((new Date().getTime()) + refreshExpirationMs))

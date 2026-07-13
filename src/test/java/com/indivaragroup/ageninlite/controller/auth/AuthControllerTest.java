@@ -192,4 +192,39 @@ class AuthControllerTest {
                 .content(jsonRequest))
                 .andExpect(status().isUnauthorized());
     }
+
+    // --- TEST LOGOUT ---
+
+    @Test
+    void logout_ShouldReturn200() throws Exception {
+        String jsonRequest = "{\"refresh_token\":\"valid_refresh_token\"}";
+
+        mockMvc.perform(post("/api/auth/logout")
+                .header("Authorization", "Bearer valid_access_token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Logout successful"));
+    }
+
+    @Test
+    void logout_WhenValidationFails_ShouldReturn400() throws Exception {
+        String jsonRequest = "{\"refresh_token\":\"\"}"; // blank
+
+        mockMvc.perform(post("/api/auth/logout")
+                .header("Authorization", "Bearer valid_access_token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void logout_WhenMissingHeader_ShouldReturn400() throws Exception {
+        String jsonRequest = "{\"refresh_token\":\"valid_refresh_token\"}";
+
+        mockMvc.perform(post("/api/auth/logout")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isBadRequest()); // Missing @RequestHeader
+    }
 }
