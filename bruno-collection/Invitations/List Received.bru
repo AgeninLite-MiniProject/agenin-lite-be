@@ -1,0 +1,25 @@
+meta {
+  name: List Received
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/invitations/received?status=PENDING&page=0&size=10
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbG...0L3A
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+  uuidA: aac5b7f1-26da-4b76-aff1-263e438e76be
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

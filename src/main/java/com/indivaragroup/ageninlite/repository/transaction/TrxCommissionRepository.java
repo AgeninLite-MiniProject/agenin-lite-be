@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,4 +22,8 @@ public interface TrxCommissionRepository extends JpaRepository<TrxCommission, UU
             @Param("commissionType") String commissionType);
 
     List<TrxCommission> findTop20ByBeneficiaryIdOrderByCreatedAtDesc(UUID beneficiaryId);
+
+    List<TrxCommission> findAllByItemIdIn(Collection<UUID> itemIds);
+
+    boolean existsByBeneficiaryIdAndSourceUserId(UUID beneficiaryId, UUID sourceUserId);
 }

@@ -6,16 +6,22 @@ import com.indivaragroup.ageninlite.dto.invitation.CancelInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.DeclineInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.InvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.SendInvitationRequest;
+import com.indivaragroup.ageninlite.dto.invitation.ReceivedInvitationListResponse;
+import com.indivaragroup.ageninlite.dto.invitation.SentInvitationListResponse;
+import com.indivaragroup.ageninlite.common.exception.AppException;
+import com.indivaragroup.ageninlite.common.exception.code.InvitationErrorCode;
 import com.indivaragroup.ageninlite.service.invitation.InvitationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -65,5 +71,51 @@ public class InvitationController {
         UUID inviterUuid = UUID.fromString(inviterId);
         CancelInvitationResponse response = invitationService.cancelInvitation(inviterUuid, inviteeId);
         return ResponseEntity.ok(new ApiResponse<>(true, "Invitation cancelled", response));
+    }
+
+    @GetMapping("/sent")
+    public ResponseEntity<ApiResponse<SentInvitationListResponse>> listSent(
+            @AuthenticationPrincipal String inviterId,
+            @RequestParam(defaultValue = "PENDING") String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        if (size > 50) {
+            throw new AppException(InvitationErrorCode.INV_0020);
+        }
+        if (size <= 0) {
+            size = 10;
+        }
+        if (page < 0) {
+            page = 0;
+        }
+
+        UUID inviterUuid = UUID.fromString(inviterId);
+        SentInvitationListResponse response = invitationService
+                .listSentInvitations(inviterUuid, status, page, size);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Sent invitations fetched", response));
+    }
+
+    @GetMapping("/received")
+    public ResponseEntity<ApiResponse<ReceivedInvitationListResponse>> listReceived(
+            @AuthenticationPrincipal String inviteeId,
+            @RequestParam(defaultValue = "PENDING") String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        if (size > 50) {
+            throw new AppException(InvitationErrorCode.INV_0020);
+        }
+        if (size <= 0) {
+            size = 10;
+        }
+        if (page < 0) {
+            page = 0;
+        }
+
+        UUID inviteeUuid = UUID.fromString(inviteeId);
+        ReceivedInvitationListResponse response = invitationService
+                .listReceivedInvitations(inviteeUuid, status, page, size);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Received invitations fetched", response));
     }
 }

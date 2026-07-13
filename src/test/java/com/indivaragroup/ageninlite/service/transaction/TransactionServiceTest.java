@@ -5,6 +5,9 @@ import com.indivaragroup.ageninlite.common.exception.code.TransactionErrorCode;
 import com.indivaragroup.ageninlite.dto.transaction.CompleteTransactionResponse;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionRequest;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionDetailResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionListResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionStatusUpdateResponse;
 import com.indivaragroup.ageninlite.entity.MstProduct;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.entity.TrxCommission;
@@ -23,6 +26,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -31,6 +38,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -571,5 +579,524 @@ class TransactionServiceTest {
         // Assert
         assertNotNull(result);
         verify(productRepository).findAllById(any());
+    }
+
+    // ==================== Group 3: cancelTransaction() ====================
+
+    @Test
+    void cancelTransaction_WhenHappyPath_ShouldUpdateStatusToCancelled() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+        when(trxTransactionRepository.save(any(TrxTransaction.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        var result = transactionService.cancelTransaction(sellerId, trxId);
+
+        assertNotNull(result);
+        assertEquals(trxId, result.getTrxId());
+        assertEquals("CANCELLED", result.getTrxStatus());
+        ArgumentCaptor<TrxTransaction> captor = ArgumentCaptor.forClass(TrxTransaction.class);
+        verify(trxTransactionRepository).save(captor.capture());
+        assertEquals("CANCELLED", captor.getValue().getTrxStatus());
+    }
+
+    @Test
+    void cancelTransaction_WhenTrxNotFound_ShouldThrowTrx0010() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.empty());
+
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.cancelTransaction(sellerId, trxId));
+        assertEquals(TransactionErrorCode.TRX_0010, ex.getErrorCode());
+        verify(trxTransactionRepository, never()).save(any(TrxTransaction.class));
+    }
+
+    @Test
+    void cancelTransaction_WhenRequesterMismatch_ShouldThrowTrx0012() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.cancelTransaction(requesterId, trxId));
+        assertEquals(TransactionErrorCode.TRX_0012, ex.getErrorCode());
+        verify(trxTransactionRepository, never()).save(any(TrxTransaction.class));
+    }
+
+    @Test
+    void cancelTransaction_WhenStatusNotPending_ShouldThrowTrx0011() {
+        trx.setTrxStatus("COMPLETED");
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.cancelTransaction(sellerId, trxId));
+        assertEquals(TransactionErrorCode.TRX_0011, ex.getErrorCode());
+        verify(trxTransactionRepository, never()).save(any(TrxTransaction.class));
+    }
+
+    // ==================== Group 4: failTransaction() ====================
+
+    @Test
+    void failTransaction_WhenHappyPath_ShouldUpdateStatusToFailed() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+        when(trxTransactionRepository.save(any(TrxTransaction.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        var result = transactionService.failTransaction(sellerId, trxId);
+
+        assertNotNull(result);
+        assertEquals(trxId, result.getTrxId());
+        assertEquals("FAILED", result.getTrxStatus());
+        ArgumentCaptor<TrxTransaction> captor = ArgumentCaptor.forClass(TrxTransaction.class);
+        verify(trxTransactionRepository).save(captor.capture());
+        assertEquals("FAILED", captor.getValue().getTrxStatus());
+    }
+
+    @Test
+    void failTransaction_WhenTrxNotFound_ShouldThrowTrx0010() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.empty());
+
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.failTransaction(sellerId, trxId));
+        assertEquals(TransactionErrorCode.TRX_0010, ex.getErrorCode());
+        verify(trxTransactionRepository, never()).save(any(TrxTransaction.class));
+    }
+
+    @Test
+    void failTransaction_WhenRequesterMismatch_ShouldThrowTrx0012() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.failTransaction(requesterId, trxId));
+        assertEquals(TransactionErrorCode.TRX_0012, ex.getErrorCode());
+        verify(trxTransactionRepository, never()).save(any(TrxTransaction.class));
+    }
+
+    @Test
+    void failTransaction_WhenStatusNotPending_ShouldThrowTrx0011() {
+        trx.setTrxStatus("CANCELLED");
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.failTransaction(sellerId, trxId));
+        assertEquals(TransactionErrorCode.TRX_0011, ex.getErrorCode());
+        verify(trxTransactionRepository, never()).save(any(TrxTransaction.class));
+    }
+
+    // ==================== Group 5: listTransactions() ====================
+
+    @Test
+    void list_WhenSellerRoleNoStatusFilter_ShouldCallFindByUserId() {
+        TrxTransaction trxInPage = trx;
+        Page<TrxTransaction> page =
+                new PageImpl<>(List.of(trxInPage), PageRequest.of(0, 10), 1);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product));
+        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
+
+        assertEquals(1, result.getTransactions().size());
+        verify(trxTransactionRepository).findByUserId(eq(sellerId), any());
+    }
+
+    @Test
+    void list_WhenSellerRoleWithStatus_ShouldCallFindByUserIdAndTrxStatus() {
+        Page<TrxTransaction> page =
+                new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(trxTransactionRepository.findByUserIdAndTrxStatus(eq(sellerId), eq("PENDING"), any())).thenReturn(page);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "SELLER", "PENDING", 0, 10);
+
+        assertNotNull(result);
+        verify(trxTransactionRepository).findByUserIdAndTrxStatus(eq(sellerId), eq("PENDING"), any());
+    }
+
+    @Test
+    void list_WhenBeneficiaryRole_ShouldCallFindTransactionsBenefitingUser() {
+        Page<TrxTransaction> page =
+                new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(trxTransactionRepository.findTransactionsBenefitingUser(eq(sellerId), eq("PENDING"), any())).thenReturn(page);
+        when(trxTransactionRepository.countCompletedTransactionsBenefitingUser(eq(sellerId))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "BENEFICIARY", "PENDING", 0, 10);
+
+        assertNotNull(result);
+        verify(trxTransactionRepository).findTransactionsBenefitingUser(eq(sellerId), eq("PENDING"), any());
+    }
+
+    @Test
+    void list_WhenInvalidRole_ShouldThrowTrx0015() {
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.listTransactions(sellerId, "INVALID", null, 0, 10));
+        assertEquals(TransactionErrorCode.TRX_0015, ex.getErrorCode());
+    }
+
+    @Test
+    void list_WhenRoleIsBlank_ShouldDefaultToSeller() {
+        Page<TrxTransaction> page =
+                new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "", null, 0, 10);
+
+        assertNotNull(result);
+        verify(trxTransactionRepository).findByUserId(eq(sellerId), any());
+    }
+
+    @Test
+    void list_WhenRoleIsMixedCase_ShouldNormalizeToUpper() {
+        Page<TrxTransaction> page =
+                new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "seller", null, 0, 10);
+
+        assertNotNull(result);
+        verify(trxTransactionRepository).findByUserId(eq(sellerId), any());
+    }
+
+    @Test
+    void list_WhenSizeExceeds50_ShouldThrowTrx0015() {
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.listTransactions(sellerId, "SELLER", null, 0, 51));
+        assertEquals(TransactionErrorCode.TRX_0015, ex.getErrorCode());
+    }
+
+    @Test
+    void list_WhenSizeIsZeroOrNegative_ShouldNormalizeTo20() {
+        Page<TrxTransaction> page =
+                new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+
+        transactionService.listTransactions(sellerId, "SELLER", null, 0, 0);
+        verify(trxTransactionRepository).findByUserId(eq(sellerId), pageableCaptor.capture());
+        assertEquals(20, pageableCaptor.getValue().getPageSize());
+    }
+
+    @Test
+    void list_WhenPageIsNegative_ShouldNormalizeTo0() {
+        Page<TrxTransaction> page =
+                new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+
+        transactionService.listTransactions(sellerId, "SELLER", null, -5, 10);
+        verify(trxTransactionRepository).findByUserId(eq(sellerId), pageableCaptor.capture());
+        assertEquals(0, pageableCaptor.getValue().getPageNumber());
+    }
+
+    @Test
+    void list_WhenEmptyResultPage_ShouldReturnEmptyItemsAndZeroTotals() {
+        Page<TrxTransaction> page =
+                new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
+
+        assertEquals(0, result.getTransactions().size());
+        assertEquals(0, BigDecimal.ZERO.compareTo(result.getTotalCommission()));
+        verify(trxItemRepository, never()).findByTrxIdIn(any());
+        verify(productRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void list_WhenStatusFilterIsCompletedAndSellerRole_ShouldUseTotalElementsForCount() {
+        Page<TrxTransaction> page =
+                new PageImpl<>(List.of(), PageRequest.of(0, 10), 7);
+        when(trxTransactionRepository.findByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"), any())).thenReturn(page);
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+
+        var result = transactionService.listTransactions(sellerId, "SELLER", "COMPLETED", 0, 10);
+
+        assertEquals(7L, result.getCompletedCount());
+        verify(trxTransactionRepository, never()).countByUserIdAndTrxStatus(any(), any());
+    }
+
+    @Test
+    void list_WhenStatusFilterIsNotCompleted_ShouldCallCountByUserIdAndTrxStatus() {
+        Page<TrxTransaction> page =
+                new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(trxTransactionRepository.findByUserIdAndTrxStatus(eq(sellerId), eq("PENDING"), any())).thenReturn(page);
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(3L);
+
+        var result = transactionService.listTransactions(sellerId, "SELLER", "PENDING", 0, 10);
+
+        assertEquals(3L, result.getCompletedCount());
+        verify(trxTransactionRepository).countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"));
+    }
+
+    // ==================== Group 6: getTransactionDetail() ====================
+
+    @Test
+    void getDetail_WhenRequesterIsSeller_ShouldReturnDetail() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product));
+        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
+        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
+
+        var result = transactionService.getTransactionDetail(sellerId, trxId);
+
+        assertNotNull(result);
+        assertEquals(trxId, result.getId());
+        assertEquals(sellerId, result.getSellerId());
+        assertEquals("Seller", result.getSellerName());
+        assertEquals(1, result.getItems().size());
+        assertEquals("Pulsa 50k", result.getProductName());
+    }
+
+    @Test
+    void getDetail_WhenRequesterIsBeneficiary_ShouldReturnDetail() {
+        UUID beneficiaryId = UUID.randomUUID();
+        trx.setUserId(sellerId);
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+        when(trxCommissionRepository.existsByBeneficiaryIdAndSourceUserId(eq(beneficiaryId), eq(sellerId))).thenReturn(true);
+        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product));
+        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
+        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
+
+        var result = transactionService.getTransactionDetail(beneficiaryId, trxId);
+
+        assertNotNull(result);
+        assertEquals(sellerId, result.getSellerId());
+        assertEquals("Seller", result.getSellerName());
+        assertEquals(0, BigDecimal.ZERO.compareTo(result.getAgentFeeAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(result.getSuperAgentFeeAmount()));
+    }
+
+    @Test
+    void getDetail_WhenTrxNotFound_ShouldThrowTrx0010() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.empty());
+
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.getTransactionDetail(sellerId, trxId));
+        assertEquals(TransactionErrorCode.TRX_0010, ex.getErrorCode());
+    }
+
+    @Test
+    void getDetail_WhenRequesterIsNeitherSellerNorBeneficiary_ShouldThrowTrx0014() {
+        UUID randomUserId = UUID.randomUUID();
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+        when(trxCommissionRepository.existsByBeneficiaryIdAndSourceUserId(eq(randomUserId), eq(sellerId))).thenReturn(false);
+
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.getTransactionDetail(randomUserId, trxId));
+        assertEquals(TransactionErrorCode.TRX_0014, ex.getErrorCode());
+        verify(trxItemRepository, never()).findByTrxId(any());
+    }
+
+    @Test
+    void getDetail_WhenItemsEmpty_ShouldStillReturnWithZeroFees() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of());
+        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
+
+        var result = transactionService.getTransactionDetail(sellerId, trxId);
+
+        assertNotNull(result);
+        assertEquals(0, result.getItems().size());
+        assertEquals(0, BigDecimal.ZERO.compareTo(result.getAgentFeeAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(result.getSuperAgentFeeAmount()));
+        verify(productRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void getDetail_WhenSellerUserNotFound_ShouldThrowTrx0010() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product));
+        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
+        when(userRepository.findById(sellerId)).thenReturn(Optional.empty());
+
+        AppException ex = assertThrows(AppException.class,
+                () -> transactionService.getTransactionDetail(sellerId, trxId));
+        assertEquals(TransactionErrorCode.TRX_0010, ex.getErrorCode());
+    }
+
+    @Test
+    void getDetail_WhenBeneficiaryHasCommissions_ShouldPopulateAgentAndSuperAgentFees() {
+        UUID beneficiaryId = UUID.randomUUID();
+        TrxCommission agentCommission = TrxCommission.builder()
+                .itemId(item.getItemId())
+                .beneficiaryId(beneficiaryId)
+                .sourceUserId(sellerId)
+                .commissionType("AGENT_FEE")
+                .feePercentage(new BigDecimal("10.00"))
+                .commissionAmount(new BigDecimal("500.00"))
+                .build();
+        TrxCommission superAgentCommission = TrxCommission.builder()
+                .itemId(item.getItemId())
+                .beneficiaryId(beneficiaryId)
+                .sourceUserId(sellerId)
+                .commissionType("SUPER_AGENT_FEE")
+                .feePercentage(new BigDecimal("5.00"))
+                .commissionAmount(new BigDecimal("250.00"))
+                .build();
+
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+        when(trxCommissionRepository.existsByBeneficiaryIdAndSourceUserId(eq(beneficiaryId), eq(sellerId))).thenReturn(true);
+        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product));
+        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(agentCommission, superAgentCommission));
+        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
+
+        var result = transactionService.getTransactionDetail(beneficiaryId, trxId);
+
+        assertEquals(0, new BigDecimal("500.00").compareTo(result.getAgentFeeAmount()));
+        assertEquals(0, new BigDecimal("250.00").compareTo(result.getSuperAgentFeeAmount()));
+    }
+
+    // ==================== Group 7: Additional branch coverage ====================
+
+    @Test
+    void list_WhenSellerRoleAndNonEmptyCommissions_ShouldTriggerFilterPredicates() {
+        TrxTransaction trxInPage = trx;
+        TrxCommission agentCommission = TrxCommission.builder()
+                .itemId(item.getItemId())
+                .beneficiaryId(sellerId)
+                .sourceUserId(sellerId)
+                .commissionType("AGENT_FEE")
+                .feePercentage(new BigDecimal("10.00"))
+                .commissionAmount(new BigDecimal("500.00"))
+                .build();
+        TrxCommission superAgentCommission = TrxCommission.builder()
+                .itemId(item.getItemId())
+                .beneficiaryId(sellerId)
+                .sourceUserId(sellerId)
+                .commissionType("SUPER_AGENT_FEE")
+                .feePercentage(new BigDecimal("5.00"))
+                .commissionAmount(new BigDecimal("250.00"))
+                .build();
+        Page<TrxTransaction> page = new PageImpl<>(List.of(trxInPage), PageRequest.of(0, 10), 1);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product));
+        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(agentCommission, superAgentCommission));
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
+
+        assertEquals(1, result.getTransactions().size());
+        assertEquals(0, new BigDecimal("500.00").compareTo(result.getTransactions().get(0).getAgentFeeAmount()));
+        assertEquals(0, new BigDecimal("250.00").compareTo(result.getTransactions().get(0).getSuperAgentFeeAmount()));
+    }
+
+    @Test
+    void getDetail_WhenProductMissingInBatch_ShouldReturnNullProductName() {
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
+        when(productRepository.findAllById(any())).thenReturn(List.of());
+        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
+        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
+
+        var result = transactionService.getTransactionDetail(sellerId, trxId);
+
+        assertNotNull(result);
+        assertNull(result.getProductName());
+        assertNull(result.getItems().get(0).getProductName());
+    }
+
+    @Test
+    void list_WhenBeneficiaryRoleAndCompletedStatus_ShouldUseTotalElementsForCount() {
+        Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 5);
+        when(trxTransactionRepository.findTransactionsBenefitingUser(eq(sellerId), eq("COMPLETED"), any())).thenReturn(page);
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+
+        var result = transactionService.listTransactions(sellerId, "BENEFICIARY", "COMPLETED", 0, 10);
+
+        assertEquals(5L, result.getCompletedCount());
+        verify(trxTransactionRepository, never()).countCompletedTransactionsBenefitingUser(any());
+    }
+
+    @Test
+    void list_WhenPageHasItemsButItemsRepoReturnsEmpty_ShouldSkipCommissionFetch() {
+        TrxTransaction trxInPage = trx;
+        Page<TrxTransaction> page = new PageImpl<>(List.of(trxInPage), PageRequest.of(0, 10), 1);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of());
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
+
+        assertEquals(1, result.getTransactions().size());
+        verify(trxCommissionRepository, never()).findAllByItemIdIn(any());
+    }
+
+    @Test
+    void list_WhenRoleIsNull_ShouldDefaultToSeller() {
+        Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, null, null, 0, 10);
+
+        assertNotNull(result);
+        verify(trxTransactionRepository).findByUserId(eq(sellerId), any());
+    }
+
+    @Test
+    void list_WhenSellerRoleExplicitlyUppercase_ShouldUseAsIs() {
+        Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
+
+        assertNotNull(result);
+        verify(trxTransactionRepository).findByUserId(eq(sellerId), any());
+    }
+
+    @Test
+    void list_WhenBeneficiaryRoleAndNonEmptyCommissions_ShouldFilterCorrectly() {
+        TrxTransaction trxInPage = trx;
+        TrxCommission superAgentCommission = TrxCommission.builder()
+                .itemId(item.getItemId())
+                .beneficiaryId(sellerId)
+                .sourceUserId(sellerId)
+                .commissionType("SUPER_AGENT_FEE")
+                .feePercentage(new BigDecimal("5.00"))
+                .commissionAmount(new BigDecimal("250.00"))
+                .build();
+        Page<TrxTransaction> page = new PageImpl<>(List.of(trxInPage), PageRequest.of(0, 10), 1);
+        when(trxTransactionRepository.findTransactionsBenefitingUser(eq(sellerId), any(), any())).thenReturn(page);
+        when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product));
+        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(superAgentCommission));
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countCompletedTransactionsBenefitingUser(eq(sellerId))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "BENEFICIARY", null, 0, 10);
+
+        assertEquals(1, result.getTransactions().size());
+        assertEquals(0, new BigDecimal("250.00").compareTo(result.getTransactions().get(0).getSuperAgentFeeAmount()));
+    }
+
+    @Test
+    void list_WhenStatusIsBlank_ShouldDefaultToNullStatus() {
+        Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactions(sellerId, "SELLER", "", 0, 10);
+
+        assertNotNull(result);
+        verify(trxTransactionRepository).findByUserId(eq(sellerId), any());
     }
 }

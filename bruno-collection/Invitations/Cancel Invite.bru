@@ -1,0 +1,25 @@
+meta {
+  name: Cancel Invite
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/invitations/{{uuidB}}/cancel
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbG...MZkg
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+  uuidB: 6c94381f-db13-402a-aabc-0967cbaa3578
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
