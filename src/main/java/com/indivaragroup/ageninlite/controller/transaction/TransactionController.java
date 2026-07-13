@@ -4,6 +4,7 @@ import com.indivaragroup.ageninlite.common.dto.ApiResponse;
 import com.indivaragroup.ageninlite.dto.transaction.CompleteTransactionResponse;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionRequest;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionStatusUpdateResponse;
 import com.indivaragroup.ageninlite.service.transaction.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -45,5 +46,15 @@ public class TransactionController {
         UUID requesterUuid = UUID.fromString(requesterId);
         CompleteTransactionResponse response = transactionService.completeTransaction(requesterUuid, id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Transaction completed", response));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<ApiResponse<TransactionStatusUpdateResponse>> cancel(
+            @AuthenticationPrincipal String requesterId,
+            @PathVariable UUID id) {
+
+        UUID requesterUuid = UUID.fromString(requesterId);
+        TransactionStatusUpdateResponse response = transactionService.cancelTransaction(requesterUuid, id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Transaction cancelled", response));
     }
 }
