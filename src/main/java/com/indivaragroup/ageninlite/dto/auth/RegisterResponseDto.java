@@ -1,20 +1,34 @@
 package com.indivaragroup.ageninlite.dto.auth;
 
 import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
-
+import lombok.Data;
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-@Getter
-@Setter
+@Data
 @Builder
 public class RegisterResponseDto {
-    private UUID id;
+    @JsonProperty("user_id")
+    private UUID userId;
+    
+    @JsonProperty("name")
     private String name;
-    private String phone;
-    private String email;
+    
+    @JsonProperty("phone_number")
+    private String phoneNumber;
+    
+    @JsonProperty("referral_code")
     private String referralCode;
-    private String status;
+    
+    @JsonProperty("role")
+    private String role;
+    
+    @JsonProperty("referred_by")
+    private UUID referredBy;
+    
+    @JsonProperty("user_status")
+    private String userStatus;
+    
+    @JsonProperty("message")
     private String message;
 }

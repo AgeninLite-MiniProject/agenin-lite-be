@@ -2,12 +2,11 @@ package com.indivaragroup.ageninlite.dto.auth;
 
 import lombok.Builder;
 import lombok.Data;
-import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Data
 @Builder
-public class LoginResponseDto {
+public class RefreshResponseDto {
     @JsonProperty("access_token")
     private String accessToken;
 
@@ -19,7 +18,4 @@ public class LoginResponseDto {
 
     @JsonProperty("expires_in")
     private Integer expiresIn;
-
-    @JsonProperty("user_id")
-    private UUID userId;
 }
