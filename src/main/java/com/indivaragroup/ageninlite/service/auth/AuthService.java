@@ -270,7 +270,7 @@ public class AuthService {
         Claims refreshClaims;
         try {
             refreshClaims = jwtUtil.extractAllClaims(request.getRefreshToken());
-            if (!"refresh".equals(refreshClaims.get("tokenId", String.class))) {
+            if (!"refresh".equals(refreshClaims.get("type", String.class))) {
                 throw new AppException(AuthErrorCode.AUTH_0031);
             }
         } catch (Exception e) {

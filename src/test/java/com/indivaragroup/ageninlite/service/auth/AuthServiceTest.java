@@ -8,10 +8,13 @@ import com.indivaragroup.ageninlite.dto.auth.RegisterRequestDto;
 import com.indivaragroup.ageninlite.dto.auth.RegisterResponseDto;
 import com.indivaragroup.ageninlite.dto.auth.RefreshRequestDto;
 import com.indivaragroup.ageninlite.dto.auth.RefreshResponseDto;
+import com.indivaragroup.ageninlite.dto.auth.LogoutRequestDto;
+import com.indivaragroup.ageninlite.entity.AuthJwtBlacklist;
 import com.indivaragroup.ageninlite.entity.AuthRefreshToken;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.repository.auth.RefreshTokenRepository;
 import com.indivaragroup.ageninlite.repository.auth.UserRepository;
+import com.indivaragroup.ageninlite.repository.auth.JwtBlacklistRepository;
 import com.indivaragroup.ageninlite.security.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.impl.DefaultClaims;
@@ -43,6 +46,8 @@ class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private JwtUtil jwtUtil;
+    @Mock
+    private JwtBlacklistRepository jwtBlacklistRepository;
 
     @InjectMocks
     private AuthService authService;
@@ -522,5 +527,171 @@ class AuthServiceTest {
 
         AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
         assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
+    }
+
+    // --- TEST LOGOUT ---
+
+    @Test
+    void logout_Success() {
+        String accessToken = "valid_access_token";
+        LogoutRequestDto request = new LogoutRequestDto();
+        request.setRefreshToken("valid_refresh_token");
+
+        Claims accessClaims = new DefaultClaims(Map.of(
+                "type", "access",
+                "jti", UUID.randomUUID().toString(),
+                "sub", existingUser.getUserId().toString(),
+                "exp", new java.util.Date(System.currentTimeMillis() + 900000)
+        ));
+
+        String tokenId = UUID.randomUUID().toString();
+        Claims refreshClaims = new DefaultClaims(Map.of(
+                "type", "refresh",
+                "tokenId", tokenId,
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .userId(existingUser.getUserId())
+                .tokenId(tokenId)
+                .build();
+
+        when(jwtUtil.extractAllClaims(accessToken)).thenReturn(accessClaims);
+        when(jwtUtil.extractAllClaims(request.getRefreshToken())).thenReturn(refreshClaims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.of(storedToken));
+
+        authService.logout(accessToken, request);
+
+        verify(jwtBlacklistRepository).save(any(AuthJwtBlacklist.class));
+        verify(refreshTokenRepository).delete(storedToken);
+    }
+
+    @Test
+    void logout_Success_Idempotent_RefreshNotFound() {
+        String accessToken = "valid_access_token";
+        LogoutRequestDto request = new LogoutRequestDto();
+        request.setRefreshToken("valid_refresh_token");
+
+        Claims accessClaims = new DefaultClaims(Map.of(
+                "type", "access",
+                "jti", UUID.randomUUID().toString(),
+                "sub", existingUser.getUserId().toString(),
+                "exp", new java.util.Date(System.currentTimeMillis() + 900000)
+        ));
+
+        String tokenId = UUID.randomUUID().toString();
+        Claims refreshClaims = new DefaultClaims(Map.of(
+                "type", "refresh",
+                "tokenId", tokenId,
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        when(jwtUtil.extractAllClaims(accessToken)).thenReturn(accessClaims);
+        when(jwtUtil.extractAllClaims(request.getRefreshToken())).thenReturn(refreshClaims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.empty());
+
+        authService.logout(accessToken, request);
+
+        verify(jwtBlacklistRepository).save(any(AuthJwtBlacklist.class));
+        verify(refreshTokenRepository, never()).delete(any());
+    }
+
+    @Test
+    void logout_Failed_AccessInvalid() {
+        String accessToken = "invalid_access_token";
+        LogoutRequestDto request = new LogoutRequestDto();
+
+        when(jwtUtil.extractAllClaims(accessToken)).thenThrow(new RuntimeException("Parsing error"));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.logout(accessToken, request));
+        assertEquals(AuthErrorCode.AUTH_0020, ex.getErrorCode());
+    }
+
+    @Test
+    void logout_Failed_AccessTypeInvalid() {
+        String accessToken = "invalid_type_access_token";
+        LogoutRequestDto request = new LogoutRequestDto();
+
+        Claims accessClaims = new DefaultClaims(Map.of(
+                "type", "refresh", // SALAH TIPE (harus 'access')
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        when(jwtUtil.extractAllClaims(accessToken)).thenReturn(accessClaims);
+
+        AppException ex = assertThrows(AppException.class, () -> authService.logout(accessToken, request));
+        assertEquals(AuthErrorCode.AUTH_0020, ex.getErrorCode());
+    }
+
+    @Test
+    void logout_Failed_RefreshInvalid() {
+        String accessToken = "valid_access_token";
+        LogoutRequestDto request = new LogoutRequestDto();
+        request.setRefreshToken("invalid_refresh_token");
+
+        Claims accessClaims = new DefaultClaims(Map.of(
+                "type", "access",
+                "jti", UUID.randomUUID().toString(),
+                "sub", existingUser.getUserId().toString(),
+                "exp", new java.util.Date()
+        ));
+
+        when(jwtUtil.extractAllClaims(accessToken)).thenReturn(accessClaims);
+        when(jwtUtil.extractAllClaims(request.getRefreshToken())).thenThrow(new RuntimeException("Parsing error"));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.logout(accessToken, request));
+        assertEquals(AuthErrorCode.AUTH_0031, ex.getErrorCode());
+    }
+
+    @Test
+    void logout_Failed_RefreshTypeInvalid() {
+        String accessToken = "valid_access_token";
+        LogoutRequestDto request = new LogoutRequestDto();
+        request.setRefreshToken("invalid_type_refresh_token");
+
+        Claims accessClaims = new DefaultClaims(Map.of(
+                "type", "access",
+                "jti", UUID.randomUUID().toString(),
+                "sub", existingUser.getUserId().toString(),
+                "exp", new java.util.Date()
+        ));
+
+        Claims refreshClaims = new DefaultClaims(Map.of(
+                "type", "access", // SALAH TIPE (harus 'refresh')
+                "tokenId", UUID.randomUUID().toString(),
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        when(jwtUtil.extractAllClaims(accessToken)).thenReturn(accessClaims);
+        when(jwtUtil.extractAllClaims(request.getRefreshToken())).thenReturn(refreshClaims);
+
+        AppException ex = assertThrows(AppException.class, () -> authService.logout(accessToken, request));
+        assertEquals(AuthErrorCode.AUTH_0031, ex.getErrorCode());
+    }
+
+    @Test
+    void logout_Failed_SubjectMismatch() {
+        String accessToken = "valid_access_token";
+        LogoutRequestDto request = new LogoutRequestDto();
+        request.setRefreshToken("valid_refresh_token");
+
+        Claims accessClaims = new DefaultClaims(Map.of(
+                "type", "access",
+                "jti", UUID.randomUUID().toString(),
+                "sub", UUID.randomUUID().toString(), // User A
+                "exp", new java.util.Date()
+        ));
+
+        Claims refreshClaims = new DefaultClaims(Map.of(
+                "type", "refresh",
+                "tokenId", UUID.randomUUID().toString(),
+                "sub", UUID.randomUUID().toString() // User B
+        ));
+
+        when(jwtUtil.extractAllClaims(accessToken)).thenReturn(accessClaims);
+        when(jwtUtil.extractAllClaims(request.getRefreshToken())).thenReturn(refreshClaims);
+
+        AppException ex = assertThrows(AppException.class, () -> authService.logout(accessToken, request));
+        assertEquals(AuthErrorCode.AUTH_0031, ex.getErrorCode());
     }
 }

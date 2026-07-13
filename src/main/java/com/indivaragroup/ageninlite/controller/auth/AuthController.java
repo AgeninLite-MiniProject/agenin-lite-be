@@ -37,6 +37,6 @@ public class AuthController {
 
         String accessToken = authHeader.substring(7);
         authService.logout(accessToken, request);
-        return ResponseEntity.ok(new LogoutResponseDto("Logout Successfull"));
+        return ResponseEntity.ok(new LogoutResponseDto("Logout successful"));
     }
 }
