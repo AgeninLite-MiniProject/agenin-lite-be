@@ -54,7 +54,12 @@ class AuthControllerTest {
         RegisterResponseDto response = RegisterResponseDto.builder()
                 .userId(UUID.randomUUID())
                 .name("Budi")
+                .phoneNumber("+6281234567890")
+                .referralCode("AGN-BUDI")
+                .referredBy(UUID.randomUUID())
+                .role("AGENT")
                 .userStatus("PASSIVE")
+                .message("Registration successful")
                 .build();
                 
         String jsonRequest = "{\"name\":\"Budi\", \"phone_number\":\"+6281234567890\", \"email\":\"budi@mail.com\", \"password\":\"password123\"}";
@@ -68,13 +73,18 @@ class AuthControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.user_id").exists())
                 .andExpect(jsonPath("$.name").value("Budi"))
-                .andExpect(jsonPath("$.user_status").value("PASSIVE"));
+                .andExpect(jsonPath("$.phone_number").value("+6281234567890"))
+                .andExpect(jsonPath("$.referral_code").value("AGN-BUDI"))
+                .andExpect(jsonPath("$.referred_by").exists())
+                .andExpect(jsonPath("$.role").value("AGENT"))
+                .andExpect(jsonPath("$.user_status").value("PASSIVE"))
+                .andExpect(jsonPath("$.message").value("Registration successful"));
     }
 
     @Test
     void register_WhenValidationFails_ShouldReturn400() throws Exception {
-        // Name is missing, phone is blank, etc
-        String jsonRequest = "{\"name\":\"Budi\", \"phoneNumber\":\"\", \"email\":\"budi@mail.com\", \"password\":\"password123\"}";
+        // Name is missing, phone is blank/invalid, etc
+        String jsonRequest = "{\"name\":\"Budi\", \"phone_number\":\"081\", \"email\":\"budi@mail.com\", \"password\":\"password123\"}";
 
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -91,6 +101,8 @@ class AuthControllerTest {
                 .accessToken("access_token")
                 .refreshToken("refresh_token")
                 .tokenType("Bearer")
+                .expiresIn(900)
+                .role("AGENT")
                 .build();
                 
         String jsonRequest = "{\"phone_number\":\"+6281234567890\", \"password\":\"password123\"}";
@@ -102,7 +114,20 @@ class AuthControllerTest {
                 .content(jsonRequest))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.access_token").value("access_token"))
-                .andExpect(jsonPath("$.refresh_token").value("refresh_token"));
+                .andExpect(jsonPath("$.refresh_token").value("refresh_token"))
+                .andExpect(jsonPath("$.expires_in").value(900))
+                .andExpect(jsonPath("$.role").value("AGENT"));
+    }
+
+    @Test
+    void login_WhenValidationFails_ShouldReturn400() throws Exception {
+        // Password too short, invalid phone
+        String jsonRequest = "{\"phone_number\":\"081234\", \"password\":\"pass\"}";
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -142,5 +167,29 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.access_token").value("new_access_token"))
                 .andExpect(jsonPath("$.refresh_token").value("new_refresh_token"));
+    }
+
+    @Test
+    void refresh_WhenValidationFails_ShouldReturn400() throws Exception {
+        String jsonRequest = "{\"refresh_token\":\"\"}";
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void refresh_WhenServiceThrowsAuth0030_ShouldReturn401() throws Exception {
+        String jsonRequest = "{\"refresh_token\":\"invalid_refresh_token\"}";
+
+        when(authService.refresh(any(RefreshRequestDto.class)))
+                .thenThrow(new com.indivaragroup.ageninlite.common.exception.AppException(
+                        com.indivaragroup.ageninlite.common.exception.code.AuthErrorCode.AUTH_0030));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isUnauthorized());
     }
 }
