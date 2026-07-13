@@ -106,7 +106,7 @@ class InvitationControllerTest {
     @Test
     void send_WithValidBody_ShouldReturn201WithBody() throws Exception {
         // Arrange
-        SendInvitationRequest request = new SendInvitationRequest(inviteeId);
+        SendInvitationRequest request = new SendInvitationRequest("+628123456789");
         InvitationResponse response = InvitationResponse.builder()
                 .inviterId(inviterId)
                 .inviteeId(inviteeId)
@@ -162,7 +162,7 @@ class InvitationControllerTest {
     @Test
     void send_WhenServiceThrowsInv0006_ShouldReturn404() throws Exception {
         // Arrange
-        SendInvitationRequest request = new SendInvitationRequest(inviteeId);
+        SendInvitationRequest request = new SendInvitationRequest("+628123456789");
         when(invitationService.sendInvitation(any(), any()))
                 .thenThrow(new AppException(InvitationErrorCode.INV_0006));
 
