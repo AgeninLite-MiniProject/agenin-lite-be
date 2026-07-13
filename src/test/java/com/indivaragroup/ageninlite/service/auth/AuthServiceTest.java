@@ -694,4 +694,69 @@ class AuthServiceTest {
         AppException ex = assertThrows(AppException.class, () -> authService.logout(accessToken, request));
         assertEquals(AuthErrorCode.AUTH_0031, ex.getErrorCode());
     }
+
+    @Test
+    void logout_Failed_RefreshTokenIdMissing() {
+        String accessToken = "valid_access_token";
+        LogoutRequestDto request = new LogoutRequestDto();
+        request.setRefreshToken("valid_refresh_token_no_jti");
+
+        Claims accessClaims = new DefaultClaims(Map.of(
+                "type", "access",
+                "jti", UUID.randomUUID().toString(),
+                "sub", existingUser.getUserId().toString(),
+                "exp", new java.util.Date()
+        ));
+
+        Claims refreshClaims = new DefaultClaims(Map.of(
+                "type", "refresh",
+                // "tokenId" sengaja dihilangkan
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        when(jwtUtil.extractAllClaims(accessToken)).thenReturn(accessClaims);
+        when(jwtUtil.extractAllClaims(request.getRefreshToken())).thenReturn(refreshClaims);
+
+        AppException ex = assertThrows(AppException.class, () -> authService.logout(accessToken, request));
+        assertEquals(AuthErrorCode.AUTH_0031, ex.getErrorCode());
+    }
+
+    @Test
+    void logout_Success_ConcurrentDuplicateBlacklist() {
+        String accessToken = "valid_access_token";
+        LogoutRequestDto request = new LogoutRequestDto();
+        request.setRefreshToken("valid_refresh_token");
+
+        Claims accessClaims = new DefaultClaims(Map.of(
+                "type", "access",
+                "jti", UUID.randomUUID().toString(),
+                "sub", existingUser.getUserId().toString(),
+                "exp", new java.util.Date(System.currentTimeMillis() + 900000)
+        ));
+
+        String tokenId = UUID.randomUUID().toString();
+        Claims refreshClaims = new DefaultClaims(Map.of(
+                "type", "refresh",
+                "tokenId", tokenId,
+                "sub", existingUser.getUserId().toString()
+        ));
+
+        AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .userId(existingUser.getUserId())
+                .tokenId(tokenId)
+                .build();
+
+        when(jwtUtil.extractAllClaims(accessToken)).thenReturn(accessClaims);
+        when(jwtUtil.extractAllClaims(request.getRefreshToken())).thenReturn(refreshClaims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.of(storedToken));
+        
+        // Simulasikan exception constraint unique token_jti saat saveAndFlush
+        when(jwtBlacklistRepository.saveAndFlush(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("Duplicate JTI"));
+
+        // Harus tetap sukses tanpa melempar exception ke luar
+        authService.logout(accessToken, request);
+
+        verify(jwtBlacklistRepository).saveAndFlush(any(AuthJwtBlacklist.class));
+        verify(refreshTokenRepository).delete(storedToken);
+    }
 }

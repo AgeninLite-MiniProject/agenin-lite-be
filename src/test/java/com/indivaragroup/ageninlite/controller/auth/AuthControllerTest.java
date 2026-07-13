@@ -227,4 +227,15 @@ class AuthControllerTest {
                 .content(jsonRequest))
                 .andExpect(status().isUnauthorized()); // Missing @RequestHeader now throws AUTH_0020
     }
+
+    @Test
+    void logout_WhenInvalidHeaderFormat_ShouldReturn401() throws Exception {
+        String jsonRequest = "{\"refresh_token\":\"valid_refresh_token\"}";
+
+        mockMvc.perform(post("/api/auth/logout")
+                .header("Authorization", "Basic valid_access_token") // Not Bearer
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isUnauthorized());
+    }
 }
