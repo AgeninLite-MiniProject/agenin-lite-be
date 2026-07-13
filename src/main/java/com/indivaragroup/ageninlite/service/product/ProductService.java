@@ -135,6 +135,24 @@ public class ProductService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<ProductResponseDto> getActiveProducts() {
+        log.info("Process get active products for agent");
+
+        return productRepository.findByProductStatus("ACTIVE").stream()
+                .map(product -> ProductResponseDto.builder()
+                        .product_id(product.getProductId())
+                        .product_name(product.getProductName())
+                        .cost_price(product.getCostPrice())
+                        .selling_price(product.getSellingPrice())
+                        .agent_fee(product.getAgentFee())
+                        .super_agent_fee(product.getSuperAgentFee())
+                        .product_status(product.getProductStatus())
+                        .message("Success")
+                        .build())
+                .toList();
+    }
+
     private void validatePricingAndFee(BigDecimal costPrice, BigDecimal sellingPrice, BigDecimal agentFee,
             BigDecimal superAgentFee) {
         if (sellingPrice.compareTo(costPrice) <= 0) {

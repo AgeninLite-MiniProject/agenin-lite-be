@@ -160,6 +160,30 @@ class ProductServiceTest {
     }
 
     @Test
+    void getActiveProducts_Success() {
+        when(productRepository.findByProductStatus("ACTIVE")).thenReturn(List.of(mockProduct));
+
+        List<ProductResponseDto> responses = productService.getActiveProducts();
+
+        assertNotNull(responses);
+        assertEquals(1, responses.size());
+        assertEquals(productId, responses.get(0).getProduct_id());
+        assertEquals("ACTIVE", responses.get(0).getProduct_status());
+        verify(productRepository, times(1)).findByProductStatus("ACTIVE");
+    }
+
+    @Test
+    void getActiveProducts_Empty() {
+        when(productRepository.findByProductStatus("ACTIVE")).thenReturn(List.of());
+
+        List<ProductResponseDto> responses = productService.getActiveProducts();
+
+        assertNotNull(responses);
+        assertEquals(0, responses.size());
+        verify(productRepository, times(1)).findByProductStatus("ACTIVE");
+    }
+
+    @Test
     void createProduct_ThrowsException_WhenSellingPriceLessThanCostPrice() {
         ProductCreateRequestDto request = new ProductCreateRequestDto();
         request.setProduct_name("Teh Pucuk");
