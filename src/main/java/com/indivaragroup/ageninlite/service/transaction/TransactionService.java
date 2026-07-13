@@ -5,6 +5,7 @@ import com.indivaragroup.ageninlite.common.exception.code.TransactionErrorCode;
 import com.indivaragroup.ageninlite.dto.transaction.CompleteTransactionResponse;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionRequest;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionStatusUpdateResponse;
 import com.indivaragroup.ageninlite.entity.MstProduct;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.entity.TrxCommission;
@@ -33,6 +34,7 @@ public class TransactionService {
     private static final int MAX_QUANTITY_PER_LINE = 100_000;
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_COMPLETED = "COMPLETED";
+    private static final String STATUS_CANCELLED = "CANCELLED";
     private static final String USER_STATUS_PASSIVE = "PASSIVE";
     private static final String USER_STATUS_ACTIVE = "ACTIVE";
     private static final String COMMISSION_TYPE_AGENT = "AGENT_FEE";
@@ -189,6 +191,31 @@ public class TransactionService {
                 .commissionsCreated(totalRowsCreated)
                 .superAgentName(superAgentName)
                 .commissions(lineResponses)
+                .build();
+    }
+
+    @Transactional
+    public TransactionStatusUpdateResponse cancelTransaction(UUID requesterId, UUID trxId) {
+        TrxTransaction trx = trxTransactionRepository.findById(trxId)
+                .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
+
+        if (!trx.getUserId().equals(requesterId)) {
+            throw new AppException(TransactionErrorCode.TRX_0012);
+        }
+
+        if (!STATUS_PENDING.equals(trx.getTrxStatus())) {
+            throw new AppException(TransactionErrorCode.TRX_0011);
+        }
+
+        trx.setTrxStatus(STATUS_CANCELLED);
+        trxTransactionRepository.save(trx);
+
+        log.info("transaction cancelled trxId={} requesterId={}", trxId, requesterId);
+
+        return TransactionStatusUpdateResponse.builder()
+                .trxId(trxId)
+                .trxStatus(STATUS_CANCELLED)
+                .message("Transaction cancelled")
                 .build();
     }
 
