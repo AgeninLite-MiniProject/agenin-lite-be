@@ -145,6 +145,8 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshTokenString)
                 .tokenType("Bearer")
+                .expiresIn(900)
+                .role(user.getRole())
                 .build();
     }
 
@@ -170,7 +172,13 @@ public class AuthService {
             log.error("Refresh failed: Missing tokenId claim");
             throw new AppException(AuthErrorCode.AUTH_0030);
         }
-        UUID userId = UUID.fromString(claims.getSubject());
+        UUID userId;
+        try {
+            userId = UUID.fromString(claims.getSubject());
+        } catch (IllegalArgumentException e) {
+            log.error("Refresh failed: Invalid subject UUID format");
+            throw new AppException(AuthErrorCode.AUTH_0030);
+        }
         // 3. Cari Data Refresh Token di Database
         AuthRefreshToken storedToken = refreshTokenRepository.findByTokenId(tokenIdStr)
                 .orElseThrow(() -> {
@@ -180,6 +188,12 @@ public class AuthService {
         // 4. Pastikan token belum di-revoke dan belum expired di database
         if (storedToken.getRevokedAt() != null || storedToken.getExpiresAt().isBefore(LocalDateTime.now())) {
             log.error("Refresh failed: Token ID {} is already revoked or expired in database", tokenIdStr);
+            throw new AppException(AuthErrorCode.AUTH_0030);
+        }
+        
+        // 4b. Pastikan user id sesuai dengan sub di JWT
+        if (!storedToken.getUserId().equals(userId)) {
+            log.error("Refresh failed: Subject in JWT does not match token owner in DB");
             throw new AppException(AuthErrorCode.AUTH_0030);
         }
         // 5. Validasi Hashing (Bypass limit 72 byte BCrypt)
@@ -197,7 +211,7 @@ public class AuthService {
 
         if (user.isDeleted()) {
             log.error("Refresh failed: User {} is deleted", userId);
-            throw new AppException(AuthErrorCode.AUTH_0011);
+            throw new AppException(AuthErrorCode.AUTH_0030);
         }
         // 7. Token Rotation (Cabut / Revoke token lama)
         storedToken.setRevokedAt(LocalDateTime.now());
@@ -228,6 +242,15 @@ public class AuthService {
     }
 
     private String generateReferralCode() {
-        return "AGN-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+        String code;
+        int maxAttempts = 5;
+        for (int i = 0; i < maxAttempts; i++) {
+            code = "AGN-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+            if (userRepository.findByReferralCode(code).isEmpty()) {
+                return code;
+            }
+        }
+        log.error("Failed to generate a unique referral code after {} attempts", maxAttempts);
+        throw new AppException(AuthErrorCode.AUTH_9999);
     }
 }

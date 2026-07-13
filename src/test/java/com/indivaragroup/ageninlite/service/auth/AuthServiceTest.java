@@ -165,6 +165,42 @@ class AuthServiceTest {
         assertEquals(AuthErrorCode.AUTH_0007, ex.getErrorCode());
     }
 
+    @Test
+    void register_Failed_ReferralCodeCollisionExhausted() {
+        when(userRepository.existsByPhoneNumber(anyString())).thenReturn(false);
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        
+        // Simulate collision every time
+        when(userRepository.findByReferralCode(anyString())).thenReturn(Optional.of(inviter));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.register(registerRequest));
+        assertEquals(AuthErrorCode.AUTH_9999, ex.getErrorCode());
+        
+        verify(userRepository, times(5)).findByReferralCode(anyString());
+        verify(userRepository, never()).save(any(MstUser.class));
+    }
+
+    @Test
+    void register_Success_WithReferralCodeCollisionResolved() {
+        when(userRepository.existsByPhoneNumber(anyString())).thenReturn(false);
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        
+        // Simulate collision twice, then success
+        when(userRepository.findByReferralCode(anyString()))
+                .thenReturn(Optional.of(inviter))
+                .thenReturn(Optional.of(inviter))
+                .thenReturn(Optional.empty());
+                
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(userRepository.save(any(MstUser.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        RegisterResponseDto response = authService.register(registerRequest);
+
+        assertNotNull(response);
+        verify(userRepository, times(3)).findByReferralCode(anyString());
+        verify(userRepository).save(any(MstUser.class));
+    }
+
     // --- TEST LOGIN ---
 
     @Test
@@ -180,6 +216,8 @@ class AuthServiceTest {
         assertNotNull(response);
         assertEquals("access_jwt", response.getAccessToken());
         assertEquals("refresh_jwt", response.getRefreshToken());
+        assertEquals(900, response.getExpiresIn());
+        assertEquals("AGENT", response.getRole());
         verify(refreshTokenRepository).save(any(AuthRefreshToken.class));
     }
 
@@ -255,6 +293,7 @@ class AuthServiceTest {
         ));
 
         AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .userId(existingUser.getUserId())
                 .tokenId(tokenId)
                 .tokenHash("storedHash")
                 .expiresAt(LocalDateTime.now().plusDays(1))
@@ -309,6 +348,7 @@ class AuthServiceTest {
         ));
 
         AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .userId(existingUser.getUserId())
                 .tokenId(tokenId)
                 .tokenHash("storedHash")
                 .expiresAt(LocalDateTime.now().minusDays(1)) // expired!
@@ -356,6 +396,7 @@ class AuthServiceTest {
         ));
 
         AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .userId(existingUser.getUserId())
                 .tokenId(tokenId)
                 .tokenHash("storedHash")
                 .expiresAt(LocalDateTime.now().plusDays(1))
@@ -379,6 +420,7 @@ class AuthServiceTest {
         ));
 
         AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .userId(existingUser.getUserId())
                 .tokenId(tokenId)
                 .tokenHash("storedHash")
                 .expiresAt(LocalDateTime.now().plusDays(1))
@@ -403,6 +445,7 @@ class AuthServiceTest {
         ));
 
         AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .userId(existingUser.getUserId())
                 .tokenId(tokenId)
                 .tokenHash("storedHash")
                 .expiresAt(LocalDateTime.now().plusDays(1))
@@ -417,7 +460,44 @@ class AuthServiceTest {
         when(userRepository.findById(existingUser.getUserId())).thenReturn(Optional.of(existingUser));
 
         AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
-        assertEquals(AuthErrorCode.AUTH_0011, ex.getErrorCode());
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
+    }
+
+    @Test
+    void refresh_Failed_InvalidSubjectUuid() {
+        Claims claims = new DefaultClaims(Map.of(
+                "tokenId", UUID.randomUUID().toString(),
+                "sub", "not-a-uuid"
+        ));
+
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
+    }
+
+    @Test
+    void refresh_Failed_SubjectMismatch() {
+        String tokenId = UUID.randomUUID().toString();
+        Claims claims = new DefaultClaims(Map.of(
+                "tokenId", tokenId,
+                "sub", UUID.randomUUID().toString() // Different from stored token
+        ));
+
+        AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .userId(existingUser.getUserId())
+                .tokenId(tokenId)
+                .tokenHash("storedHash")
+                .expiresAt(LocalDateTime.now().plusDays(1))
+                .build();
+
+        when(jwtUtil.isTokenValid(anyString())).thenReturn(true);
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.of(storedToken));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.refresh(refreshRequest));
+        assertEquals(AuthErrorCode.AUTH_0030, ex.getErrorCode());
     }
 
     @Test
@@ -429,6 +509,7 @@ class AuthServiceTest {
         ));
 
         AuthRefreshToken storedToken = AuthRefreshToken.builder()
+                .userId(existingUser.getUserId())
                 .tokenId(tokenId)
                 .tokenHash("storedHash")
                 .expiresAt(LocalDateTime.now().plusDays(1))

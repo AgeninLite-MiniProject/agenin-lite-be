@@ -20,6 +20,6 @@ public class LoginResponseDto {
     @JsonProperty("expires_in")
     private Integer expiresIn;
 
-    @JsonProperty("user_id")
-    private UUID userId;
+    @JsonProperty("role")
+    private String role;
 }
