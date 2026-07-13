@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -208,56 +209,22 @@ public class TransactionService {
 
     @Transactional
     public TransactionStatusUpdateResponse cancelTransaction(UUID requesterId, UUID trxId) {
-        TrxTransaction trx = trxTransactionRepository.findById(trxId)
-                .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
-
-        if (!trx.getUserId().equals(requesterId)) {
-            throw new AppException(TransactionErrorCode.TRX_0012);
-        }
-
-        if (!STATUS_PENDING.equals(trx.getTrxStatus())) {
-            throw new AppException(TransactionErrorCode.TRX_0011);
-        }
-
-        trx.setTrxStatus(STATUS_CANCELLED);
-        trxTransactionRepository.save(trx);
-
-        log.info("transaction cancelled trxId={} requesterId={}", trxId, requesterId);
-
-        return TransactionStatusUpdateResponse.builder()
-                .trxId(trxId)
-                .trxStatus(STATUS_CANCELLED)
-                .message("Transaction cancelled")
-                .build();
+        return terminateTransaction(requesterId, trxId, STATUS_CANCELLED, "Transaction cancelled", "transaction cancelled");
     }
 
     @Transactional
     public TransactionStatusUpdateResponse failTransaction(UUID requesterId, UUID trxId) {
-        TrxTransaction trx = trxTransactionRepository.findById(trxId)
-                .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
-
-        if (!trx.getUserId().equals(requesterId)) {
-            throw new AppException(TransactionErrorCode.TRX_0012);
-        }
-
-        if (!STATUS_PENDING.equals(trx.getTrxStatus())) {
-            throw new AppException(TransactionErrorCode.TRX_0011);
-        }
-
-        trx.setTrxStatus(STATUS_FAILED);
-        trxTransactionRepository.save(trx);
-
-        log.info("transaction failed trxId={} requesterId={}", trxId, requesterId);
-
-        return TransactionStatusUpdateResponse.builder()
-                .trxId(trxId)
-                .trxStatus(STATUS_FAILED)
-                .message("Transaction failed")
-                .build();
+        return terminateTransaction(requesterId, trxId, STATUS_FAILED, "Transaction failed", "transaction failed");
     }
 
-    private TransactionListItemDto buildListItem(TrxTransaction trx, UUID viewerId, String viewerRole) {
-        List<TrxItem> items = trxItemRepository.findByTrxId(trx.getTrxId());
+    private TransactionListItemDto buildListItem(
+            TrxTransaction trx,
+            UUID viewerId,
+            String viewerRole,
+            List<TrxItem> items,
+            Map<UUID, MstProduct> productById,
+            List<TrxCommission> commissions) {
+
         if (items.isEmpty()) {
             return TransactionListItemDto.builder()
                     .id(trx.getTrxId())
@@ -271,18 +238,8 @@ public class TransactionService {
                     .build();
         }
 
-        List<UUID> productIds = items.stream()
-                .map(TrxItem::getProductId)
-                .distinct()
-                .toList();
-        Map<UUID, MstProduct> productById = productRepository.findAllById(productIds).stream()
-                .collect(Collectors.toMap(MstProduct::getProductId, p -> p));
-
-        TrxItem firstItem = items.get(0);
+        TrxItem firstItem = items.getFirst();
         MstProduct firstProduct = productById.get(firstItem.getProductId());
-
-        List<UUID> itemIds = items.stream().map(TrxItem::getItemId).toList();
-        List<TrxCommission> commissions = trxCommissionRepository.findAllByItemIdIn(itemIds);
 
         BigDecimal agentFeeAmount = commissions.stream()
                 .filter(c -> COMMISSION_TYPE_AGENT.equals(c.getCommissionType()))
@@ -333,20 +290,52 @@ public class TransactionService {
             page = 0;
         }
 
+        String effectiveStatus = (status == null || status.isBlank()) ? null : status;
+
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
         Page<TrxTransaction> trxPage;
         if (ROLE_SELLER.equals(effectiveRole)) {
-            trxPage = (status == null || status.isBlank())
+            trxPage = (effectiveStatus == null)
                     ? trxTransactionRepository.findByUserId(requesterId, pageable)
-                    : trxTransactionRepository.findByUserIdAndTrxStatus(requesterId, status, pageable);
+                    : trxTransactionRepository.findByUserIdAndTrxStatus(requesterId, effectiveStatus, pageable);
         } else {
-            trxPage = trxTransactionRepository.findTransactionsBenefitingUser(requesterId, status, pageable);
+            trxPage = trxTransactionRepository.findTransactionsBenefitingUser(requesterId, effectiveStatus, pageable);
         }
 
-        List<TransactionListItemDto> items = trxPage.getContent().stream()
-                .map(trx -> buildListItem(trx, requesterId, effectiveRole))
-                .toList();
+        List<TrxTransaction> pageTrxs = trxPage.getContent();
+        List<TransactionListItemDto> items;
+        if (pageTrxs.isEmpty()) {
+            items = List.of();
+        } else {
+            List<UUID> trxIds = pageTrxs.stream().map(TrxTransaction::getTrxId).toList();
+
+            List<TrxItem> allItems = trxItemRepository.findByTrxIdIn(trxIds);
+            Map<UUID, List<TrxItem>> itemsByTrxId = allItems.stream()
+                    .collect(Collectors.groupingBy(TrxItem::getTrxId));
+
+            List<UUID> productIds = allItems.stream()
+                    .map(TrxItem::getProductId)
+                    .distinct()
+                    .toList();
+            Map<UUID, MstProduct> productById = byId(
+                    productRepository.findAllById(productIds), MstProduct::getProductId);
+
+            List<UUID> itemIds = allItems.stream().map(TrxItem::getItemId).toList();
+            List<TrxCommission> allCommissions = itemIds.isEmpty()
+                    ? List.of()
+                    : trxCommissionRepository.findAllByItemIdIn(itemIds);
+
+            items = pageTrxs.stream()
+                    .map(trx -> buildListItem(
+                            trx,
+                            requesterId,
+                            effectiveRole,
+                            itemsByTrxId.getOrDefault(trx.getTrxId(), List.of()),
+                            productById,
+                            allCommissions))
+                    .toList();
+        }
 
         BigDecimal totalAgentFee = trxCommissionRepository
                 .sumCommissionAmountByBeneficiaryIdAndCommissionType(requesterId, COMMISSION_TYPE_AGENT);
@@ -357,12 +346,19 @@ public class TransactionService {
 
         long completedCount;
         if (ROLE_SELLER.equals(effectiveRole)) {
-            completedCount = trxPage.getTotalElements() > 0
-                    ? trxTransactionRepository.findByUserIdAndTrxStatus(requesterId, "COMPLETED",
-                            PageRequest.of(0, 1)).getTotalElements()
-                    : 0L;
+            if (STATUS_COMPLETED.equals(effectiveStatus)) {
+                completedCount = trxPage.getTotalElements();
+            } else {
+                completedCount = trxTransactionRepository
+                        .countByUserIdAndTrxStatus(requesterId, STATUS_COMPLETED);
+            }
         } else {
-            completedCount = trxTransactionRepository.countCompletedTransactionsBenefitingUser(requesterId);
+            if (STATUS_COMPLETED.equals(effectiveStatus)) {
+                completedCount = trxPage.getTotalElements();
+            } else {
+                completedCount = trxTransactionRepository
+                        .countCompletedTransactionsBenefitingUser(requesterId);
+            }
         }
 
         return TransactionListResponse.builder()
@@ -388,18 +384,30 @@ public class TransactionService {
             throw new AppException(TransactionErrorCode.TRX_0014);
         }
 
-        TransactionListItemDto base = buildListItem(trx, requesterId, ROLE_SELLER);
+        List<TrxItem> items = trxItemRepository.findByTrxId(trxId);
+
+        Map<UUID, MstProduct> productById;
+        if (items.isEmpty()) {
+            productById = Map.of();
+        } else {
+            List<UUID> productIds = items.stream()
+                    .map(TrxItem::getProductId)
+                    .distinct()
+                    .toList();
+            productById = byId(productRepository.findAllById(productIds), MstProduct::getProductId);
+        }
+
+        List<UUID> itemIds = items.stream().map(TrxItem::getItemId).toList();
+        List<TrxCommission> commissions = itemIds.isEmpty()
+                ? List.of()
+                : trxCommissionRepository.findAllByItemIdIn(itemIds);
+
+        TransactionListItemDto base = buildListItem(
+                trx, requesterId, isSeller ? ROLE_SELLER : ROLE_BENEFICIARY,
+                items, productById, commissions);
 
         MstUser seller = userRepository.findById(trx.getUserId())
                 .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
-
-        List<TrxItem> items = trxItemRepository.findByTrxId(trxId);
-        List<UUID> productIds = items.stream()
-                .map(TrxItem::getProductId)
-                .distinct()
-                .toList();
-        Map<UUID, MstProduct> productById = productRepository.findAllById(productIds).stream()
-                .collect(Collectors.toMap(MstProduct::getProductId, p -> p));
 
         List<CreateTransactionResponse.TransactionItemResponse> itemResponses = items.stream()
                 .map(item -> {
@@ -445,6 +453,36 @@ public class TransactionService {
         return USER_STATUS_PASSIVE.equals(seller.getUserStatus());
     }
 
+    private static <T> Map<UUID, T> byId(List<T> rows, Function<T, UUID> keyFn) {
+        return rows.stream().collect(Collectors.toMap(keyFn, x -> x));
+    }
+
+    private TransactionStatusUpdateResponse terminateTransaction(
+            UUID requesterId, UUID trxId, String newStatus,
+            String responseMessage, String logMessage) {
+        TrxTransaction trx = trxTransactionRepository.findById(trxId)
+                .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
+
+        if (!trx.getUserId().equals(requesterId)) {
+            throw new AppException(TransactionErrorCode.TRX_0012);
+        }
+
+        if (!STATUS_PENDING.equals(trx.getTrxStatus())) {
+            throw new AppException(TransactionErrorCode.TRX_0011);
+        }
+
+        trx.setTrxStatus(newStatus);
+        trxTransactionRepository.save(trx);
+
+        log.info("{} trxId={} requesterId={}", logMessage, trxId, requesterId);
+
+        return TransactionStatusUpdateResponse.builder()
+                .trxId(trxId)
+                .trxStatus(newStatus)
+                .message(responseMessage)
+                .build();
+    }
+
     public CreateTransactionResponse createTransaction(UUID sellerId, CreateTransactionRequest request) {
         log.info("createTransaction started sellerId={} itemCount={}", sellerId, request.getItems().size());
 
@@ -468,8 +506,7 @@ public class TransactionService {
                 .map(CreateTransactionRequest.CreateTransactionItem::getProductId)
                 .toList();
         List<MstProduct> products = productRepository.findAllById(productIds);
-        Map<UUID, MstProduct> productById = products.stream()
-                .collect(Collectors.toMap(MstProduct::getProductId, p -> p));
+        Map<UUID, MstProduct> productById = byId(products, MstProduct::getProductId);
 
         // === Step 5: per-item existence + ACTIVE check, build line items, accumulate totals ===
         List<TrxItem> itemsToSave = new ArrayList<>();

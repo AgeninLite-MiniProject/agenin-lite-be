@@ -19,6 +19,8 @@ public interface TrxTransactionRepository extends JpaRepository<TrxTransaction, 
 
     Page<TrxTransaction> findByUserIdAndTrxStatus(UUID userId, String trxStatus, Pageable pageable);
 
+    long countByUserIdAndTrxStatus(UUID userId, String trxStatus);
+
     @Query("SELECT t FROM TrxTransaction t WHERE t.trxId IN " +
            "(SELECT i.trxId FROM TrxItem i WHERE i.itemId IN " +
            "(SELECT c.itemId FROM TrxCommission c WHERE c.beneficiaryId = :beneficiaryId)) " +

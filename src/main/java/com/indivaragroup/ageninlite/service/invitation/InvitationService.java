@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -47,10 +48,6 @@ public class InvitationService {
 
     private final TrxInvitationRepository invitationRepository;
     private final UserRepository userRepository;
-
-    public static int getMaxPendingInvites() {
-        return MAX_PENDING_INVITES;
-    }
 
     @Transactional
     public InvitationResponse sendInvitation(UUID inviterId, SendInvitationRequest request) {
@@ -209,8 +206,8 @@ public class InvitationService {
                 .map(TrxInvitation::getInviteeId)
                 .distinct()
                 .toList();
-        Map<UUID, MstUser> inviteesById = userRepository.findAllById(inviteeIds).stream()
-                .collect(Collectors.toMap(MstUser::getUserId, u -> u));
+        Map<UUID, MstUser> inviteesById = byId(
+                userRepository.findAllById(inviteeIds), MstUser::getUserId);
 
         List<SentInvitationItemDto> items = result.getContent().stream()
                 .map(inv -> {
@@ -233,7 +230,7 @@ public class InvitationService {
         return SentInvitationListResponse.builder()
                 .invitations(items)
                 .pendingCount(pendingCount)
-                .pendingCap(getMaxPendingInvites())
+                .pendingCap(MAX_PENDING_INVITES)
                 .build();
     }
 
@@ -261,8 +258,8 @@ public class InvitationService {
                 .map(TrxInvitation::getInviterId)
                 .distinct()
                 .toList();
-        Map<UUID, MstUser> invitersById = userRepository.findAllById(inviterIds).stream()
-                .collect(Collectors.toMap(MstUser::getUserId, u -> u));
+        Map<UUID, MstUser> invitersById = byId(
+                userRepository.findAllById(inviterIds), MstUser::getUserId);
 
         List<ReceivedInvitationItemDto> items = result.getContent().stream()
                 .map(inv -> {
@@ -313,6 +310,10 @@ public class InvitationService {
             throw new AppException(InvitationErrorCode.INV_0007);
         }
         return invitee;
+    }
+
+    private static <T> Map<UUID, T> byId(List<T> rows, Function<T, UUID> keyFn) {
+        return rows.stream().collect(Collectors.toMap(keyFn, x -> x));
     }
 
     private InvitationResponse buildInvitationResponse(UUID inviterId, UUID inviteeId, MstUser invitee, TrxInvitation saved) {
