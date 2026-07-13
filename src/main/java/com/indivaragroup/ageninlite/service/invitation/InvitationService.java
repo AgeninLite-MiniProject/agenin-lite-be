@@ -7,19 +7,27 @@ import com.indivaragroup.ageninlite.dto.invitation.CancelInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.DeclineInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.InvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.SendInvitationRequest;
+import com.indivaragroup.ageninlite.dto.invitation.SentInvitationItemDto;
+import com.indivaragroup.ageninlite.dto.invitation.SentInvitationListResponse;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.entity.TrxInvitation;
 import com.indivaragroup.ageninlite.repository.auth.UserRepository;
 import com.indivaragroup.ageninlite.repository.invitation.TrxInvitationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -27,6 +35,8 @@ import java.util.UUID;
 public class InvitationService {
     private static final int MAX_PENDING_INVITES = 3;
     private static final int MAX_DOWNLINERS_PER_USER = 10;
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final int DEFAULT_PAGE_SIZE = 10;
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_ACCEPTED = "ACCEPTED";
     private static final String STATUS_EXPIRED = "EXPIRED";
@@ -35,6 +45,10 @@ public class InvitationService {
 
     private final TrxInvitationRepository invitationRepository;
     private final UserRepository userRepository;
+
+    public static int getMaxPendingInvites() {
+        return MAX_PENDING_INVITES;
+    }
 
     @Transactional
     public InvitationResponse sendInvitation(UUID inviterId, SendInvitationRequest request) {
@@ -166,6 +180,58 @@ public class InvitationService {
                 .status(STATUS_CANCELLED)
                 .cancelledAt(invitation.getCancelledAt())
                 .message("Invitation cancelled")
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public SentInvitationListResponse listSentInvitations(
+            UUID inviterId, String status, int page, int size) {
+
+        String effectiveStatus = (status == null || status.isBlank()) ? STATUS_PENDING : status;
+
+        if (size > MAX_PAGE_SIZE) {
+            throw new AppException(InvitationErrorCode.INV_0020);
+        }
+        if (size <= 0) {
+            size = DEFAULT_PAGE_SIZE;
+        }
+        if (page < 0) {
+            page = 0;
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<TrxInvitation> result = invitationRepository
+                .findByInviterIdAndInvitationStatus(inviterId, effectiveStatus, pageable);
+
+        List<UUID> inviteeIds = result.getContent().stream()
+                .map(TrxInvitation::getInviteeId)
+                .distinct()
+                .toList();
+        Map<UUID, MstUser> inviteesById = userRepository.findAllById(inviteeIds).stream()
+                .collect(Collectors.toMap(MstUser::getUserId, u -> u));
+
+        List<SentInvitationItemDto> items = result.getContent().stream()
+                .map(inv -> {
+                    MstUser invitee = inviteesById.get(inv.getInviteeId());
+                    return SentInvitationItemDto.builder()
+                            .inviterId(inv.getInviterId())
+                            .inviteeId(inv.getInviteeId())
+                            .inviteeName(invitee != null ? invitee.getUserName() : null)
+                            .inviteePhone(invitee != null ? invitee.getPhoneNumber() : null)
+                            .status(inv.getInvitationStatus())
+                            .createdAt(inv.getCreatedAt())
+                            .respondedAt(inv.getRespondedAt())
+                            .build();
+                })
+                .toList();
+
+        long pendingCount = invitationRepository
+                .countByInviterIdAndInvitationStatus(inviterId, STATUS_PENDING);
+
+        return SentInvitationListResponse.builder()
+                .invitations(items)
+                .pendingCount(pendingCount)
+                .pendingCap(getMaxPendingInvites())
                 .build();
     }
 

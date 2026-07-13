@@ -27,6 +27,9 @@ public enum InvitationErrorCode implements ErrorCode {
     // --- Decline Invitation Errors ---
     INV_0014("Invitation not found", HttpStatus.NOT_FOUND),                         // 404
 
+    // --- Pagination validation ---
+    INV_0020("Page size must not exceed 50", HttpStatus.BAD_REQUEST),               // 400
+
     // --- General Invitation Error ---
     INV_9999("Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR);            // 500
 
