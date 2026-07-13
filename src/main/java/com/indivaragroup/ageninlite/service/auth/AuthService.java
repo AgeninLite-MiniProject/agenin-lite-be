@@ -151,6 +151,7 @@ public class AuthService {
                 .tokenType("Bearer")
                 .expiresIn(900)
                 .role(user.getRole())
+                .name(user.getUserName())
                 .build();
     }
 
