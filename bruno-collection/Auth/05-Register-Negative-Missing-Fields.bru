@@ -1,0 +1,25 @@
+meta {
+  name: 05 Register Negative Missing Fields
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/api/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "",
+    "phone_number": "",
+    "email": "",
+    "password": "pass",
+    "referral_code": ""
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+}
