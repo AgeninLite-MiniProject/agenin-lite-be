@@ -8,6 +8,8 @@ import com.indivaragroup.ageninlite.dto.invitation.DeclineInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.InvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.SendInvitationRequest;
 import com.indivaragroup.ageninlite.dto.invitation.SentInvitationItemDto;
+import com.indivaragroup.ageninlite.dto.invitation.ReceivedInvitationItemDto;
+import com.indivaragroup.ageninlite.dto.invitation.ReceivedInvitationListResponse;
 import com.indivaragroup.ageninlite.dto.invitation.SentInvitationListResponse;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.entity.TrxInvitation;
@@ -232,6 +234,56 @@ public class InvitationService {
                 .invitations(items)
                 .pendingCount(pendingCount)
                 .pendingCap(getMaxPendingInvites())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ReceivedInvitationListResponse listReceivedInvitations(
+            UUID inviteeId, String status, int page, int size) {
+
+        String effectiveStatus = (status == null || status.isBlank()) ? STATUS_PENDING : status;
+
+        if (size > MAX_PAGE_SIZE) {
+            throw new AppException(InvitationErrorCode.INV_0020);
+        }
+        if (size <= 0) {
+            size = DEFAULT_PAGE_SIZE;
+        }
+        if (page < 0) {
+            page = 0;
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<TrxInvitation> result = invitationRepository
+                .findByInviteeIdAndInvitationStatus(inviteeId, effectiveStatus, pageable);
+
+        List<UUID> inviterIds = result.getContent().stream()
+                .map(TrxInvitation::getInviterId)
+                .distinct()
+                .toList();
+        Map<UUID, MstUser> invitersById = userRepository.findAllById(inviterIds).stream()
+                .collect(Collectors.toMap(MstUser::getUserId, u -> u));
+
+        List<ReceivedInvitationItemDto> items = result.getContent().stream()
+                .map(inv -> {
+                    MstUser inviter = invitersById.get(inv.getInviterId());
+                    return ReceivedInvitationItemDto.builder()
+                            .inviterId(inv.getInviterId())
+                            .inviterName(inviter != null ? inviter.getUserName() : null)
+                            .inviterPhone(inviter != null ? inviter.getPhoneNumber() : null)
+                            .inviterAvatarUrl(null)
+                            .status(inv.getInvitationStatus())
+                            .createdAt(inv.getCreatedAt())
+                            .build();
+                })
+                .toList();
+
+        long pendingCount = invitationRepository
+                .countByInviteeIdAndInvitationStatus(inviteeId, STATUS_PENDING);
+
+        return ReceivedInvitationListResponse.builder()
+                .invitations(items)
+                .pendingCount(pendingCount)
                 .build();
     }
 

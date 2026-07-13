@@ -21,4 +21,6 @@ public interface TrxInvitationRepository extends JpaRepository<TrxInvitation, UU
     List<TrxInvitation> findAllByInviteeIdAndInvitationStatus(UUID inviteeId, String invitationStatus);
 
     Page<TrxInvitation> findByInviterIdAndInvitationStatus(UUID inviterId, String invitationStatus, Pageable pageable);
+
+    Page<TrxInvitation> findByInviteeIdAndInvitationStatus(UUID inviteeId, String invitationStatus, Pageable pageable);
 }
