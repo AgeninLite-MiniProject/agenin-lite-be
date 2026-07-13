@@ -6,6 +6,7 @@ import com.indivaragroup.ageninlite.dto.invitation.CancelInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.DeclineInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.InvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.SendInvitationRequest;
+import com.indivaragroup.ageninlite.dto.invitation.ReceivedInvitationListResponse;
 import com.indivaragroup.ageninlite.dto.invitation.SentInvitationListResponse;
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.InvitationErrorCode;
@@ -93,5 +94,28 @@ public class InvitationController {
         SentInvitationListResponse response = invitationService
                 .listSentInvitations(inviterUuid, status, page, size);
         return ResponseEntity.ok(new ApiResponse<>(true, "Sent invitations fetched", response));
+    }
+
+    @GetMapping("/received")
+    public ResponseEntity<ApiResponse<ReceivedInvitationListResponse>> listReceived(
+            @AuthenticationPrincipal String inviteeId,
+            @RequestParam(defaultValue = "PENDING") String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        if (size > 50) {
+            throw new AppException(InvitationErrorCode.INV_0020);
+        }
+        if (size <= 0) {
+            size = 10;
+        }
+        if (page < 0) {
+            page = 0;
+        }
+
+        UUID inviteeUuid = UUID.fromString(inviteeId);
+        ReceivedInvitationListResponse response = invitationService
+                .listReceivedInvitations(inviteeUuid, status, page, size);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Received invitations fetched", response));
     }
 }
