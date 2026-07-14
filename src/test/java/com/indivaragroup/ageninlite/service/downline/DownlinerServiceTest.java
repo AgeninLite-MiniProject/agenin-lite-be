@@ -3,6 +3,7 @@ package com.indivaragroup.ageninlite.service.downline;
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.DownlinerErrorCode;
 import com.indivaragroup.ageninlite.dto.downline.DownlineDetailResponseDto;
+import com.indivaragroup.ageninlite.dto.downline.DownlineTransactionHistoryDto;
 import com.indivaragroup.ageninlite.entity.MstProduct;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.entity.TrxCommission;
@@ -178,5 +179,120 @@ class DownlinerServiceTest {
         assertEquals(DownlinerErrorCode.DWN_0002, ex.getErrorCode());
         
         verifyNoInteractions(trxTransactionRepository, trxCommissionRepository);
+    }
+
+    @Test
+    void getDownlineDetail_ReferredByNull_ThrowsException() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 20);
+        downliner.setReferredBy(null);
+        when(userRepository.findById(downlinerId)).thenReturn(Optional.of(downliner));
+
+        // Act & Assert
+        AppException ex = assertThrows(AppException.class, () ->
+                downlinerService.getDownlineDetail(requesterId, downlinerId, pageable));
+        assertEquals(DownlinerErrorCode.DWN_0002, ex.getErrorCode());
+    }
+
+    @Test
+    void getDownlineDetail_NoTransactions_Success() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 20);
+        when(userRepository.findById(downlinerId)).thenReturn(Optional.of(downliner));
+        when(trxTransactionRepository.findLastTransactionDateByUserId(downlinerId)).thenReturn(null);
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndSourceUserIdAndCommissionType(
+                requesterId, downlinerId, "SUPER_AGENT_FEE"))
+                .thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.findByUserIdOrderByCreatedAtDesc(downlinerId, pageable))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        // Act
+        DownlineDetailResponseDto response = downlinerService.getDownlineDetail(requesterId, downlinerId, pageable);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(0, response.getContent().size());
+        verifyNoInteractions(trxItemRepository, productRepository);
+    }
+
+    @Test
+    void getDownlineDetail_TransactionWithMultipleItems_Success() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 20);
+
+        when(userRepository.findById(downlinerId)).thenReturn(Optional.of(downliner));
+        when(trxTransactionRepository.findLastTransactionDateByUserId(downlinerId)).thenReturn(LocalDateTime.now());
+        
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndSourceUserIdAndCommissionType(
+                requesterId, downlinerId, "SUPER_AGENT_FEE"))
+                .thenReturn(new BigDecimal("15000"));
+
+        TrxTransaction trx1 = TrxTransaction.builder()
+                .trxId(trxId)
+                .userId(downlinerId)
+                .totalAmount(new BigDecimal("100000"))
+                .trxStatus("COMPLETED")
+                .completedAt(LocalDateTime.now())
+                .build();
+                
+        TrxTransaction trx2 = TrxTransaction.builder() // Transaction with NO items
+                .trxId(UUID.randomUUID())
+                .userId(downlinerId)
+                .totalAmount(new BigDecimal("0"))
+                .trxStatus("COMPLETED")
+                .completedAt(LocalDateTime.now())
+                .build();
+                
+        Page<TrxTransaction> page = new PageImpl<>(List.of(trx1, trx2));
+        when(trxTransactionRepository.findByUserIdOrderByCreatedAtDesc(downlinerId, pageable)).thenReturn(page);
+
+        // Multiple items for trx1
+        UUID itemId2 = UUID.randomUUID();
+        TrxItem item1 = TrxItem.builder()
+                .itemId(itemId)
+                .trxId(trxId)
+                .productId(productId)
+                .quantity(2)
+                .build();
+        TrxItem item2 = TrxItem.builder()
+                .itemId(itemId2)
+                .trxId(trxId)
+                .productId(UUID.randomUUID()) // different product
+                .quantity(1)
+                .build();
+                
+        when(trxItemRepository.findByTrxIdIn(anyCollection())).thenReturn(List.of(item1, item2));
+
+        MstProduct product1 = MstProduct.builder()
+                .productId(productId)
+                .productName("Product A")
+                .build();
+        when(productRepository.findAllById(anyCollection())).thenReturn(List.of(product1));
+
+        TrxCommission commission = TrxCommission.builder()
+                .commissionId(UUID.randomUUID())
+                .itemId(itemId)
+                .commissionAmount(new BigDecimal("5000"))
+                .build();
+        when(trxCommissionRepository.findByBeneficiaryIdAndItemIdInAndCommissionType(
+                eq(requesterId), anyCollection(), eq("SUPER_AGENT_FEE")))
+                .thenReturn(List.of(commission));
+
+        // Act
+        DownlineDetailResponseDto response = downlinerService.getDownlineDetail(requesterId, downlinerId, pageable);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(2, response.getContent().size());
+        
+        // Assert trx1 (has multiple items)
+        DownlineTransactionHistoryDto history1 = response.getContent().get(0);
+        assertEquals("Product A dan 1 lainnya", history1.getProductName());
+        assertEquals(3, history1.getQuantity()); // 2 + 1
+        
+        // Assert trx2 (has NO items)
+        DownlineTransactionHistoryDto history2 = response.getContent().get(1);
+        assertEquals("No Item", history2.getProductName());
+        assertEquals(0, history2.getQuantity());
     }
 }
