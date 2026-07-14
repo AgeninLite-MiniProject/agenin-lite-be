@@ -1,13 +1,12 @@
-package com.indivaragroup.ageninlite.controller.user.dashboard;
+package com.indivaragroup.ageninlite.controller.dashboard;
 
 import com.indivaragroup.ageninlite.common.dto.ApiResponse;
 import com.indivaragroup.ageninlite.dto.dashboard.DashboardResponseDto;
-import com.indivaragroup.ageninlite.service.user.dashboard.DashboardService;
+import com.indivaragroup.ageninlite.service.dashboard.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 

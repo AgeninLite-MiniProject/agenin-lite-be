@@ -1,4 +1,4 @@
-package com.indivaragroup.ageninlite.service.user.dashboard;
+package com.indivaragroup.ageninlite.service.dashboard;
 
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.UserErrorCode;

@@ -1,4 +1,4 @@
-package com.indivaragroup.ageninlite.service.user.dashboard;
+package com.indivaragroup.ageninlite.service.dashboard;
 
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.UserErrorCode;
@@ -42,6 +42,7 @@ public class DashboardService {
                 .userStatus(user.getUserStatus())
                 .userName(user.getUserName())
                 .phoneNumber(user.getPhoneNumber())
+                .email(user.getEmail())
                 .referralCode(user.getReferralCode())
                 .referralByName(referredByName)
                 .build();

@@ -1,9 +1,9 @@
-package com.indivaragroup.ageninlite.controller.user.dashboard;
+package com.indivaragroup.ageninlite.controller.dashboard;
 
 import com.indivaragroup.ageninlite.common.exception.GlobalExceptionHandler;
 import com.indivaragroup.ageninlite.dto.dashboard.DashboardResponseDto;
 import com.indivaragroup.ageninlite.dto.dashboard.UserSummaryDto;
-import com.indivaragroup.ageninlite.service.user.dashboard.DashboardService;
+import com.indivaragroup.ageninlite.service.dashboard.DashboardService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +71,7 @@ class DashboardControllerTest {
                 .userSummaryDto(UserSummaryDto.builder()
                         .userId(userId)
                         .userName("Naufal")
+                        .email("naufal@example.com")
                         .build())
                 .totalAgentFee(new BigDecimal("1000"))
                 .totalSuperAgentFee(new BigDecimal("500"))
