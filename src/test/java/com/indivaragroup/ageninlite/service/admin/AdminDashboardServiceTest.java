@@ -43,10 +43,10 @@ class AdminDashboardServiceTest {
 
     @Test
     void getDashboardOverview_Success() {
-        when(userRepository.countByRole("AGENT")).thenReturn(100L);
+        when(userRepository.countByRoleAndIsDeletedFalse("AGENT")).thenReturn(100L);
         when(userRepository.countByRoleAndUserStatusAndIsDeletedFalse("AGENT", "ACTIVE")).thenReturn(80L);
         when(productRepository.countByProductStatus("ACTIVE")).thenReturn(15L);
-        when(transactionRepository.count()).thenReturn(50L);
+        when(transactionRepository.countByTrxStatus("COMPLETED")).thenReturn(50L);
 
         AdminDashboardResponseDto response = adminDashboardService.getDashboardOverview();
 
