@@ -24,10 +24,10 @@ public class AdminDashboardService {
     public AdminDashboardResponseDto getDashboardOverview() {
         log.info("Process get admin dashboard overview");
 
-        long totalUsers = userRepository.countByRole("AGENT");
+        long totalUsers = userRepository.countByRoleAndIsDeletedFalse("AGENT");
         long activeAgents = userRepository.countByRoleAndUserStatusAndIsDeletedFalse("AGENT", "ACTIVE");
         long totalProducts = productRepository.countByProductStatus("ACTIVE");
-        long totalTransactions = transactionRepository.count();
+        long totalTransactions = transactionRepository.countByTrxStatus("COMPLETED");
 
         List<RecentActivityDto> recentActivities = new ArrayList<>();
 
