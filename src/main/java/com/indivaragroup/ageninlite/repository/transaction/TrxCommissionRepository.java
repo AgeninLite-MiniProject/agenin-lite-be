@@ -48,7 +48,7 @@ public interface TrxCommissionRepository extends JpaRepository<TrxCommission, UU
     @Query("SELECT COALESCE(SUM(c.commissionAmount), 0) FROM TrxCommission c " +
             "WHERE c.beneficiaryId = :beneficiaryId " +
             "AND c.sourceUserId = :sourceUserId " +
-            "AND c.commissiontype = :commissionType")
+            "AND c.commissionType = :commissionType")
     BigDecimal sumCommissionAmountByBeneficiaryIdAndSourceUserIdAndCommissionType(
             @Param("beneficiaryId") UUID beneficiaryId,
             @Param("sourceUserId") UUID sourceUserId,

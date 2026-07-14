@@ -8,6 +8,7 @@ import com.indivaragroup.ageninlite.repository.auth.UserRepository;
 import com.indivaragroup.ageninlite.repository.invitation.TrxInvitationRepository;
 import com.indivaragroup.ageninlite.repository.transaction.TrxCommissionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
@@ -24,6 +26,7 @@ public class DashboardService {
     private final TrxInvitationRepository trxInvitationRepository;
 
     public DashboardResponseDto getDashboardData(UUID userId) {
+        log.info("Fetching dashboard data for user: {}", userId);
         // tarik data user
         MstUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(UserErrorCode.USR_0001));
@@ -51,6 +54,7 @@ public class DashboardService {
         BigDecimal agentFee = trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(userId, "AGENT_FEE");
         BigDecimal superAgentFee = trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(userId, "SUPER_AGENT_FEE");
         BigDecimal totalCommission = agentFee.add(superAgentFee);
+        log.debug("Calculated commission for user {}: agentFee={}, superAgentFee={}, total={}", userId, agentFee, superAgentFee, totalCommission);
 
         // ambil data downliners
         List<DownlinerDto> downliners = userRepository.findDirectDownlinersByUserId(userId);
@@ -58,6 +62,7 @@ public class DashboardService {
         // ambil data undangan (sent & received)
         int pendingSent = (int) trxInvitationRepository.countByInviterIdAndInvitationStatus(userId, "PENDING");
         List<PendingInvitationDto> pendingReceived = trxInvitationRepository.findPendingInvitationsReceivedByUserId(userId);
+        log.debug("User {} has {} downliners, {} pending sent, {} pending received", userId, downliners.size(), pendingSent, pendingReceived.size());
 
         // limit 20 aja
         List<RecentCommissionDto> recentCommissions = trxCommissionRepository.findRecentCommissionsDtoByBeneficiaryId(userId, PageRequest.of(0,20));
