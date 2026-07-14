@@ -1,5 +1,6 @@
 package com.indivaragroup.ageninlite.repository.auth;
 
+import com.indivaragroup.ageninlite.dto.dashboard.DownlinerDto;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +22,17 @@ public interface UserRepository extends JpaRepository<MstUser, UUID> {
     int countByReferredBy(UUID referredBy);
     long countByRoleAndUserStatusAndIsDeletedFalse(String role, String userStatus);
     long countByRole(String role);
+
+    @Query("""
+    SELECT new com.indivaragroup.ageninlite.dto.dashboard.DownlinerDto(
+        u.userId,
+        u.userName,
+        u.phoneNumber
+    )
+    FROM MstUser u
+    WHERE u.referredBy = :userId
+    """)
+    List<DownlinerDto> findDirectDownlinersByUserId(@Param("userId") UUID userId);
 
     @Query("SELECT u FROM MstUser u WHERE u.role = 'AGENT' AND " +
            "(:query IS NULL OR :query = '' OR LOWER(u.userName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(u.phoneNumber) LIKE LOWER(CONCAT('%', :query, '%'))) AND " +
