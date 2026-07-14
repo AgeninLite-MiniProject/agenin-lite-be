@@ -12,8 +12,8 @@ post {
 
 body:json {
   {
-    "phone_number": "+6281234567890",
-    "password": "password123"
+    "phone_number": "+628123322254",
+    "password": "password321"
   }
 }
 
@@ -22,8 +22,8 @@ vars:pre-request {
 }
 
 script:post-response {
-  if (res.body && res.body.access_token) {
-    bru.setEnvVar("jwt_token", res.body.access_token);
-    bru.setEnvVar("refresh_token", res.body.refresh_token);
+  if (res.body && res.body.data && res.body.data.accessToken) {
+    bru.setEnvVar("jwt_token", res.body.data.accessToken);
+    bru.setEnvVar("refresh_token", res.body.data.refreshToken);
   }
 }

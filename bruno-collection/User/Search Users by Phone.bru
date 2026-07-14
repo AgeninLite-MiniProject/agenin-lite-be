@@ -1,0 +1,28 @@
+meta {
+  name: Search Users by Phone
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/users/search?phone=0812
+  body: none
+  auth: bearer
+}
+
+params:query {
+  phone: 0812
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

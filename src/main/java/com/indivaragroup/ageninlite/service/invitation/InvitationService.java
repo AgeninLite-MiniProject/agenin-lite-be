@@ -2,6 +2,7 @@ package com.indivaragroup.ageninlite.service.invitation;
 
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.InvitationErrorCode;
+import com.indivaragroup.ageninlite.common.utils.PhoneUtils;
 import com.indivaragroup.ageninlite.dto.invitation.AcceptInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.CancelInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.DeclineInvitationResponse;
@@ -335,27 +336,10 @@ public class InvitationService {
     }
 
     private String normalizeToE164(String raw) {
-        if (raw == null) {
+        try{
+            return PhoneUtils.normalizeToE164(raw);
+        }catch(IllegalArgumentException ex){
             throw new AppException(InvitationErrorCode.INV_0022);
         }
-
-        String digits = raw.replaceAll("[\\s\\-\\.\\(\\)]", "");
-
-        if (!digits.matches("^\\+?\\d{6,15}$")) {
-            throw new AppException(InvitationErrorCode.INV_0022);
-        }
-
-        if (digits.startsWith("+")) {
-            return digits;
-        }
-
-        if (digits.startsWith("62")) {
-            return "+" + digits;
-        }
-
-        if (digits.startsWith("0")) {
-            return "+62" + digits.substring(1);
-        }
-        throw new AppException(InvitationErrorCode.INV_0022);
     }
 }
