@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,4 +39,8 @@ public interface TrxTransactionRepository extends JpaRepository<TrxTransaction, 
            "(SELECT c.itemId FROM TrxCommission c WHERE c.beneficiaryId = :beneficiaryId)) " +
            "AND t.trxStatus = 'COMPLETED'")
     long countCompletedTransactionsBenefitingUser(@Param("beneficiaryId") UUID beneficiaryId);
+
+    @Query(" SELECT MAX(t.completedAt) FROM TrxTransaction t WHERE t.userId = :userId AND t.trxStatus = 'COMPLETED'")
+    LocalDateTime findLastTransactionDateByUserId(@Param("userId") UUID userId);
+    Page<TrxTransaction> findByUserIdOrderByCreatedAtDesc(UUID userId, Pageable pageable);
 }
