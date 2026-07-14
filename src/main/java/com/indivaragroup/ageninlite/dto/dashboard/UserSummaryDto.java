@@ -26,6 +26,9 @@ public class UserSummaryDto {
     @JsonProperty("phone_number")
     private String phoneNumber;
 
+    @JsonProperty("email")
+    private String email;
+
     @JsonProperty("referral_code")
     private String referralCode;
 
