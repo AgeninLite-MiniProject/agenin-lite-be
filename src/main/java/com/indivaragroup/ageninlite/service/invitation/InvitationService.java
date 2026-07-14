@@ -2,6 +2,7 @@ package com.indivaragroup.ageninlite.service.invitation;
 
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.InvitationErrorCode;
+import com.indivaragroup.ageninlite.common.utils.PhoneUtils;
 import com.indivaragroup.ageninlite.dto.invitation.AcceptInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.CancelInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.DeclineInvitationResponse;
@@ -51,13 +52,20 @@ public class InvitationService {
 
     @Transactional
     public InvitationResponse sendInvitation(UUID inviterId, SendInvitationRequest request) {
-        UUID inviteeId = request.getInviteeId();
+        String e164 = normalizeToE164(request.getPhoneNumber());
+
+        MstUser invitee = userRepository.findByPhoneNumber(e164)
+                .orElseThrow(() -> new AppException(InvitationErrorCode.INV_0023));
+
+        if (invitee.isDeleted()) {
+            throw new AppException(InvitationErrorCode.INV_0007);
+        }
+
+        UUID inviteeId = invitee.getUserId();
 
         if (inviterId.equals(inviteeId)) {
             throw new AppException(InvitationErrorCode.INV_0001);
         }
-
-        MstUser invitee = findActiveInviteeOrThrow(inviteeId);
 
         if (invitee.getReferredBy() != null) {
             throw new AppException(InvitationErrorCode.INV_0004);
@@ -325,5 +333,13 @@ public class InvitationService {
                 .createdAt(saved.getCreatedAt())
                 .message("Invitation sent successfully")
                 .build();
+    }
+
+    private String normalizeToE164(String raw) {
+        try{
+            return PhoneUtils.normalizeToE164(raw);
+        }catch(IllegalArgumentException ex){
+            throw new AppException(InvitationErrorCode.INV_0022);
+        }
     }
 }

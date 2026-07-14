@@ -30,6 +30,9 @@ public enum InvitationErrorCode implements ErrorCode {
     // --- Pagination validation ---
     INV_0020("Page size must not exceed 50", HttpStatus.BAD_REQUEST),               // 400
 
+    INV_0022("Invalid phone number format", HttpStatus.BAD_REQUEST),
+    INV_0023("Phone number is not registered", HttpStatus.NOT_FOUND),
+
     // --- General Invitation Error ---
     INV_9999("Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR);            // 500
 
