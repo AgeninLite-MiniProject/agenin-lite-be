@@ -30,6 +30,8 @@ public interface UserRepository extends JpaRepository<MstUser, UUID> {
 
     long countByRole(String role);
 
+    long countByRoleAndIsDeletedFalse(String role);
+
     @Query("""
             SELECT new com.indivaragroup.ageninlite.dto.dashboard.DownlinerDto(
                 u.userId,
