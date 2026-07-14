@@ -12,6 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,6 +30,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
@@ -323,6 +326,16 @@ class TransactionControllerTest {
     }
 
     @Test
+    void fail_WhenServiceThrowsTrx0012_ShouldReturn403() throws Exception {
+        when(transactionService.failTransaction(any(), any()))
+                .thenThrow(new AppException(TransactionErrorCode.TRX_0012));
+
+        mockMvc.perform(post("/api/transactions/{id}/fail", trxId))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("TRX_0012: You can only complete your own transactions"));
+    }
+
+    @Test
     void fail_WithMalformedPathUuid_ShouldReturn400() throws Exception {
         mockMvc.perform(post("/api/transactions/not-a-uuid/fail"))
                 .andExpect(status().isBadRequest());
@@ -351,6 +364,53 @@ class TransactionControllerTest {
                 .andExpect(jsonPath("$.data.totalCommission").value(0))
                 .andExpect(jsonPath("$.data.completedCount").value(0))
                 .andExpect(jsonPath("$.data.size").value(20));
+
+        // C2: verify defaults (role=SELLER, status=null, page=0, size=20) are forwarded to the service
+        ArgumentCaptor<String> roleCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> statusCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Integer> pageCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<Integer> sizeCaptor = ArgumentCaptor.forClass(Integer.class);
+        verify(transactionService).listTransactions(
+                any(UUID.class), roleCaptor.capture(), statusCaptor.capture(),
+                pageCaptor.capture(), sizeCaptor.capture());
+        assertEquals("SELLER", roleCaptor.getValue());
+        assertNull(statusCaptor.getValue());
+        assertEquals(0, pageCaptor.getValue());
+        assertEquals(20, sizeCaptor.getValue());
+    }
+
+    @Test
+    void list_WithRoleAndStatusParams_ShouldForwardToService() throws Exception {
+        // C3: explicit non-default query params must be forwarded verbatim
+        var response = com.indivaragroup.ageninlite.dto.transaction.TransactionListResponse.builder()
+                .transactions(List.of())
+                .totalCommission(BigDecimal.ZERO)
+                .completedCount(0L)
+                .page(1)
+                .size(10)
+                .totalElements(0L)
+                .totalPages(0)
+                .build();
+        when(transactionService.listTransactions(any(), any(), any(), anyInt(), anyInt())).thenReturn(response);
+
+        mockMvc.perform(get("/api/transactions")
+                        .param("role", "BENEFICIARY")
+                        .param("status", "COMPLETED")
+                        .param("page", "1")
+                        .param("size", "10"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<String> roleCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> statusCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Integer> pageCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<Integer> sizeCaptor = ArgumentCaptor.forClass(Integer.class);
+        verify(transactionService).listTransactions(
+                any(UUID.class), roleCaptor.capture(), statusCaptor.capture(),
+                pageCaptor.capture(), sizeCaptor.capture());
+        assertEquals("BENEFICIARY", roleCaptor.getValue());
+        assertEquals("COMPLETED", statusCaptor.getValue());
+        assertEquals(1, pageCaptor.getValue());
+        assertEquals(10, sizeCaptor.getValue());
     }
 
     @Test
@@ -415,5 +475,51 @@ class TransactionControllerTest {
         mockMvc.perform(get("/api/transactions/not-a-uuid"))
                 .andExpect(status().isBadRequest());
         verify(transactionService, never()).getTransactionDetail(any(), any());
+    }
+
+    // ==================== Group 7: listV2 (GET /api/transactions?v=2) ====================
+
+    @Test
+    void listV2_WithDefaultQueryParams_ShouldReturn200WithBody() throws Exception {
+        var response = com.indivaragroup.ageninlite.dto.transaction.TransactionListResponseV2.builder()
+                .transactions(List.of())
+                .totalCommission(BigDecimal.ZERO)
+                .completedCount(0L)
+                .page(0)
+                .size(20)
+                .totalElements(0L)
+                .totalPages(0)
+                .build();
+        when(transactionService.listTransactionsV2(any(), any(), any(), anyInt(), anyInt())).thenReturn(response);
+
+        mockMvc.perform(get("/api/transactions").param("v", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Transactions fetched"))
+                .andExpect(jsonPath("$.data.totalCommission").value(0))
+                .andExpect(jsonPath("$.data.completedCount").value(0))
+                .andExpect(jsonPath("$.data.size").value(20));
+
+        // V2 must NOT call the V1 service method
+        verify(transactionService, never()).listTransactions(any(), any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void listV2_WhenSizeExceeds50_ShouldReturn400WithTrx0015() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                        .param("v", "2")
+                        .param("size", "51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("TRX_0015: Invalid view mode, must be SELLER or BENEFICIARY"));
+        verify(transactionService, never()).listTransactionsV2(any(), any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void listV2_WithMalformedJwtPrincipal_ShouldReturn400() throws Exception {
+        setJwtPrincipal("not-a-uuid");
+
+        mockMvc.perform(get("/api/transactions").param("v", "2"))
+                .andExpect(status().isBadRequest());
+        verify(transactionService, never()).listTransactionsV2(any(), any(), any(), anyInt(), anyInt());
     }
 }

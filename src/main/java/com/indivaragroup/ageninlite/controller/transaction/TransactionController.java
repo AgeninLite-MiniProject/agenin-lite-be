@@ -8,6 +8,7 @@ import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionRequest;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionResponse;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionDetailResponse;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionListResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionListResponseV2;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionStatusUpdateResponse;
 import com.indivaragroup.ageninlite.service.transaction.TransactionService;
 import jakarta.validation.Valid;
@@ -89,6 +90,24 @@ public class TransactionController {
         UUID requesterUuid = UUID.fromString(requesterId);
         TransactionListResponse response = transactionService
                 .listTransactions(requesterUuid, role, status, page, size);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Transactions fetched", response));
+    }
+
+    @GetMapping(params = "v=2")
+    public ResponseEntity<ApiResponse<TransactionListResponseV2>> listV2(
+            @AuthenticationPrincipal String requesterId,
+            @RequestParam(defaultValue = "SELLER") String role,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (size > 50) {
+            throw new AppException(TransactionErrorCode.TRX_0015);
+        }
+
+        UUID requesterUuid = UUID.fromString(requesterId);
+        TransactionListResponseV2 response = transactionService
+                .listTransactionsV2(requesterUuid, role, status, page, size);
         return ResponseEntity.ok(new ApiResponse<>(true, "Transactions fetched", response));
     }
 
