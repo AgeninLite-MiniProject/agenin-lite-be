@@ -14,7 +14,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RecentCommisionDto {
+public class RecentCommissionDto {
 
     @JsonProperty("commission_id")
     private UUID commissionId;
