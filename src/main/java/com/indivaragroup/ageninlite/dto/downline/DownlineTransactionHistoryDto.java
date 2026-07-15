@@ -27,4 +27,7 @@ public class DownlineTransactionHistoryDto {
     @JsonProperty("commission_earned")
     private BigDecimal commissionEarned;
 
+    @JsonProperty("super_agent_fee_amount")
+    private BigDecimal superAgentFeeAmount;
+
 }

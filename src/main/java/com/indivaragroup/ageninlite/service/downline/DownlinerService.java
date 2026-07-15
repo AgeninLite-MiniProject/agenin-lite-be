@@ -112,6 +112,7 @@ public class DownlinerService {
                         .status(trx.getTrxStatus())
                         .completedAt(trx.getCompletedAt())
                         .commissionEarned(commissionEarned)
+                        .superAgentFeeAmount(commissionEarned)
                         .build());
             }
         }
