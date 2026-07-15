@@ -31,6 +31,9 @@ class AdminDashboardServiceTest {
     @Mock
     private TrxTransactionRepository transactionRepository;
 
+    @Mock
+    private com.indivaragroup.ageninlite.repository.audit.AuditLogRepository auditLogRepository;
+
     @InjectMocks
     private AdminDashboardService adminDashboardService;
 
@@ -47,6 +50,7 @@ class AdminDashboardServiceTest {
         when(userRepository.countByRoleAndUserStatusAndIsDeletedFalse("AGENT", "ACTIVE")).thenReturn(80L);
         when(productRepository.countByProductStatus("ACTIVE")).thenReturn(15L);
         when(transactionRepository.countByTrxStatus("COMPLETED")).thenReturn(50L);
+        when(auditLogRepository.findByActionInOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any())).thenReturn(org.springframework.data.domain.Page.empty());
 
         AdminDashboardResponseDto response = adminDashboardService.getDashboardOverview();
 
