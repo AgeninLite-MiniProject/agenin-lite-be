@@ -84,14 +84,20 @@ class DownlinerControllerTest {
                 .status("ACTIVE")
                 .build();
 
+        com.indivaragroup.ageninlite.dto.downline.DownlineTransactionItemDto item = com.indivaragroup.ageninlite.dto.downline.DownlineTransactionItemDto.builder()
+                .productName("Produk A")
+                .quantity(2)
+                .amount(new BigDecimal("200000"))
+                .commissionEarned(new BigDecimal("10000"))
+                .build();
+
         DownlineTransactionHistoryDto history = DownlineTransactionHistoryDto.builder()
                 .trxId(UUID.randomUUID())
-                .productName("Produk A dan 1 lainnya")
-                .quantity(2)
+                .items(List.of(item))
                 .amount(new BigDecimal("200000"))
                 .status("COMPLETED")
                 .completedAt(LocalDateTime.now())
-                .commissionEarned(new BigDecimal("10000"))
+                .totalCommissionEarned(new BigDecimal("10000"))
                 .build();
 
         DownlineDetailResponseDto mockResponse = DownlineDetailResponseDto.builder()
@@ -114,7 +120,7 @@ class DownlinerControllerTest {
                 .andExpect(jsonPath("$.message").value("Downliner detail fetched successfully"))
                 .andExpect(jsonPath("$.data.profit_income_from_agent").value(50000))
                 .andExpect(jsonPath("$.data.agentDetail.user_id").value(downlinerId.toString()))
-                .andExpect(jsonPath("$.data.content[0].product_name").value("Produk A dan 1 lainnya"));
+                .andExpect(jsonPath("$.data.content[0].items[0].product_name").value("Produk A"));
 
         verify(downlinerService).getDownlineDetail(requesterId, downlinerId, PageRequest.of(0, 20));
     }

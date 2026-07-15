@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -14,20 +15,15 @@ public class DownlineTransactionHistoryDto {
 
     private UUID trxId;
 
-    @JsonProperty("product_name")
-    private String productName;
+    private List<DownlineTransactionItemDto> items;
 
-    private int quantity;
     private BigDecimal amount;
     private String status;
 
     @JsonProperty("completed_at")
     private LocalDateTime completedAt;
 
-    @JsonProperty("commission_earned")
-    private BigDecimal commissionEarned;
-
-    @JsonProperty("super_agent_fee_amount")
-    private BigDecimal superAgentFeeAmount;
+    @JsonProperty("total_commission_earned")
+    private BigDecimal totalCommissionEarned;
 
 }
