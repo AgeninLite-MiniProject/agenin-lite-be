@@ -62,15 +62,29 @@ class AdminDashboardServiceTest {
         log2.setActorId(null);
         log2.setAuditStatus("SUCCESS");
         log2.setCreatedAt(java.time.LocalDateTime.now());
+        
+        com.indivaragroup.ageninlite.entity.SysAuditLog log3 = new com.indivaragroup.ageninlite.entity.SysAuditLog();
+        log3.setAction(com.indivaragroup.ageninlite.common.enums.AuditAction.INVITE_ACCEPTED);
+        UUID missingUserId = UUID.randomUUID();
+        log3.setActorId(missingUserId);
+        log3.setAuditStatus("SUCCESS");
+        log3.setCreatedAt(java.time.LocalDateTime.now());
+
+        com.indivaragroup.ageninlite.entity.SysAuditLog log4 = new com.indivaragroup.ageninlite.entity.SysAuditLog();
+        log4.setAction(com.indivaragroup.ageninlite.common.enums.AuditAction.USER_ACTIVATED);
+        log4.setActorId(null);
+        log4.setAuditStatus("SUCCESS");
+        log4.setCreatedAt(java.time.LocalDateTime.now());
 
         org.springframework.data.domain.Page<com.indivaragroup.ageninlite.entity.SysAuditLog> mockPage = 
-            new org.springframework.data.domain.PageImpl<>(List.of(log1, log2));
+            new org.springframework.data.domain.PageImpl<>(List.of(log1, log2, log3, log4));
 
         when(auditLogRepository.findByActionInOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any())).thenReturn(mockPage);
 
         com.indivaragroup.ageninlite.entity.MstUser mockUser = new com.indivaragroup.ageninlite.entity.MstUser();
         mockUser.setUserName("Test Agent");
         when(userRepository.findById(userId)).thenReturn(java.util.Optional.of(mockUser));
+        when(userRepository.findById(missingUserId)).thenReturn(java.util.Optional.empty());
 
         AdminDashboardResponseDto response = adminDashboardService.getDashboardOverview();
 
@@ -81,10 +95,14 @@ class AdminDashboardServiceTest {
         assertEquals(50L, response.getTotal_transactions());
 
         List<RecentActivityDto> activities = response.getRecent_activities();
-        assertEquals(2, activities.size());
+        assertEquals(4, activities.size());
         assertEquals("Test Agent", activities.get(0).getUser());
         assertEquals("Transaksi Baru", activities.get(0).getAction());
         assertEquals("System/Unknown", activities.get(1).getUser());
         assertEquals("Registrasi Downline", activities.get(1).getAction());
+        assertEquals("Unknown User", activities.get(2).getUser());
+        assertEquals("Terima Undangan Jaringan", activities.get(2).getAction());
+        assertEquals("System/Unknown", activities.get(3).getUser());
+        assertEquals("USER_ACTIVATED", activities.get(3).getAction());
     }
 }
