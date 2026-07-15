@@ -50,7 +50,27 @@ class AdminDashboardServiceTest {
         when(userRepository.countByRoleAndUserStatusAndIsDeletedFalse("AGENT", "ACTIVE")).thenReturn(80L);
         when(productRepository.countByProductStatus("ACTIVE")).thenReturn(15L);
         when(transactionRepository.countByTrxStatus("COMPLETED")).thenReturn(50L);
-        when(auditLogRepository.findByActionInOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any())).thenReturn(org.springframework.data.domain.Page.empty());
+
+        com.indivaragroup.ageninlite.entity.SysAuditLog log1 = new com.indivaragroup.ageninlite.entity.SysAuditLog();
+        log1.setAction(com.indivaragroup.ageninlite.common.enums.AuditAction.TRANSACTION_COMPLETE);
+        log1.setActorId(userId);
+        log1.setAuditStatus("SUCCESS");
+        log1.setCreatedAt(java.time.LocalDateTime.now());
+
+        com.indivaragroup.ageninlite.entity.SysAuditLog log2 = new com.indivaragroup.ageninlite.entity.SysAuditLog();
+        log2.setAction(com.indivaragroup.ageninlite.common.enums.AuditAction.REGISTER_WITH_REFERRAL);
+        log2.setActorId(null);
+        log2.setAuditStatus("SUCCESS");
+        log2.setCreatedAt(java.time.LocalDateTime.now());
+
+        org.springframework.data.domain.Page<com.indivaragroup.ageninlite.entity.SysAuditLog> mockPage = 
+            new org.springframework.data.domain.PageImpl<>(List.of(log1, log2));
+
+        when(auditLogRepository.findByActionInOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any())).thenReturn(mockPage);
+
+        com.indivaragroup.ageninlite.entity.MstUser mockUser = new com.indivaragroup.ageninlite.entity.MstUser();
+        mockUser.setUserName("Test Agent");
+        when(userRepository.findById(userId)).thenReturn(java.util.Optional.of(mockUser));
 
         AdminDashboardResponseDto response = adminDashboardService.getDashboardOverview();
 
@@ -61,6 +81,10 @@ class AdminDashboardServiceTest {
         assertEquals(50L, response.getTotal_transactions());
 
         List<RecentActivityDto> activities = response.getRecent_activities();
-        assertEquals(0, activities.size());
+        assertEquals(2, activities.size());
+        assertEquals("Test Agent", activities.get(0).getUser());
+        assertEquals("Transaksi Baru", activities.get(0).getAction());
+        assertEquals("System/Unknown", activities.get(1).getUser());
+        assertEquals("Registrasi Downline", activities.get(1).getAction());
     }
 }
