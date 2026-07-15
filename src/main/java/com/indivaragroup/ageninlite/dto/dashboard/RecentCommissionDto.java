@@ -25,7 +25,7 @@ public class RecentCommissionDto {
     @JsonProperty("product_name")
     private String productName;
 
-    @JsonProperty("commissiom_amount")
+    @JsonProperty("commission_amount")
     private BigDecimal commissionAmount;
 
     @JsonProperty("user_name")

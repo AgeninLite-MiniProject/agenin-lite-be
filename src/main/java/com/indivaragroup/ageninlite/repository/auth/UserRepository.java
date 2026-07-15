@@ -36,7 +36,8 @@ public interface UserRepository extends JpaRepository<MstUser, UUID> {
             SELECT new com.indivaragroup.ageninlite.dto.dashboard.DownlinerDto(
                 u.userId,
                 u.userName,
-                u.phoneNumber
+                u.phoneNumber,
+                u.userStatus
             )
             FROM MstUser u
             WHERE u.referredBy = :userId
