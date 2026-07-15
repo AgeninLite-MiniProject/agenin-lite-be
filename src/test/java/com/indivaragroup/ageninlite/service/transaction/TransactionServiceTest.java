@@ -19,6 +19,7 @@ import com.indivaragroup.ageninlite.repository.product.ProductRepository;
 import com.indivaragroup.ageninlite.repository.transaction.TrxCommissionRepository;
 import com.indivaragroup.ageninlite.repository.transaction.TrxItemRepository;
 import com.indivaragroup.ageninlite.repository.transaction.TrxTransactionRepository;
+import com.indivaragroup.ageninlite.service.commission.CommissionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,11 +35,14 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -59,6 +63,9 @@ class TransactionServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private CommissionService commissionService;
 
     @InjectMocks
     private TransactionService transactionService;
@@ -153,6 +160,26 @@ class TransactionServiceTest {
                                 .build()
                 ))
                 .build();
+
+        lenient().when(commissionService.sumForViewer(any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    List<TrxCommission> commissions = invocation.getArgument(0);
+                    @SuppressWarnings("unchecked")
+                    Set<UUID> itemIds = invocation.getArgument(1);
+                    String commissionType = invocation.getArgument(2);
+                    UUID viewerId = invocation.getArgument(3);
+                    String viewerRole = invocation.getArgument(4);
+                    return commissions.stream()
+                            .filter(c -> itemIds.contains(c.getItemId()))
+                            .filter(c -> commissionType.equals(c.getCommissionType()))
+                            .filter(c -> "SELLER".equals(viewerRole)
+                                    ? viewerId.equals(c.getSourceUserId())
+                                    : viewerId.equals(c.getBeneficiaryId()))
+                            .map(TrxCommission::getCommissionAmount)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                });
     }
 
     private CreateTransactionRequest.CreateTransactionItem item(UUID productId, int quantity) {
@@ -172,7 +199,12 @@ class TransactionServiceTest {
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
         when(userRepository.findById(uplineId)).thenReturn(Optional.of(upline));
-        when(trxCommissionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        List<TrxCommission> expectedRows = List.of(mock(TrxCommission.class), mock(TrxCommission.class));
+        List<CompleteTransactionResponse.LineCommission> expectedLineResponses = List.of(
+                CompleteTransactionResponse.LineCommission.builder().build());
+        when(commissionService.calculate(any(), any(), any(), any()))
+                .thenReturn(new CommissionService.CalculationResult(expectedRows, expectedLineResponses));
+        when(commissionService.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(trxTransactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // Act
@@ -300,7 +332,12 @@ class TransactionServiceTest {
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
         when(userRepository.findById(uplineId)).thenReturn(Optional.of(upline));
-        when(trxCommissionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        List<TrxCommission> expectedRows = List.of(mock(TrxCommission.class), mock(TrxCommission.class));
+        List<CompleteTransactionResponse.LineCommission> expectedLineResponses = List.of(
+                CompleteTransactionResponse.LineCommission.builder().build());
+        when(commissionService.calculate(any(), any(), any(), any()))
+                .thenReturn(new CommissionService.CalculationResult(expectedRows, expectedLineResponses));
+        when(commissionService.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(trxTransactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // Act
@@ -320,7 +357,12 @@ class TransactionServiceTest {
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(userRepository.findById(sellerId)).thenReturn(Optional.of(passiveSeller));
         when(userRepository.findById(uplineId)).thenReturn(Optional.of(upline));
-        when(trxCommissionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        List<TrxCommission> expectedRows = List.of(mock(TrxCommission.class), mock(TrxCommission.class));
+        List<CompleteTransactionResponse.LineCommission> expectedLineResponses = List.of(
+                CompleteTransactionResponse.LineCommission.builder().build());
+        when(commissionService.calculate(any(), any(), any(), any()))
+                .thenReturn(new CommissionService.CalculationResult(expectedRows, expectedLineResponses));
+        when(commissionService.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(trxTransactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.save(any(MstUser.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -342,7 +384,12 @@ class TransactionServiceTest {
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
         when(userRepository.findById(uplineId)).thenReturn(Optional.empty());
-        when(trxCommissionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        List<TrxCommission> expectedRows = List.of(mock(TrxCommission.class));
+        List<CompleteTransactionResponse.LineCommission> expectedLineResponses = List.of(
+                CompleteTransactionResponse.LineCommission.builder().build());
+        when(commissionService.calculate(any(), any(), any(), any()))
+                .thenReturn(new CommissionService.CalculationResult(expectedRows, expectedLineResponses));
+        when(commissionService.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(trxTransactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // Act
@@ -361,7 +408,12 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
-        when(trxCommissionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        List<TrxCommission> expectedRows = List.of(mock(TrxCommission.class));
+        List<CompleteTransactionResponse.LineCommission> expectedLineResponses = List.of(
+                CompleteTransactionResponse.LineCommission.builder().build());
+        when(commissionService.calculate(any(), any(), any(), any()))
+                .thenReturn(new CommissionService.CalculationResult(expectedRows, expectedLineResponses));
+        when(commissionService.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(trxTransactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // Act
@@ -381,7 +433,12 @@ class TransactionServiceTest {
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
         when(userRepository.findById(uplineId)).thenReturn(Optional.of(upline));
-        doThrow(new DataIntegrityViolationException("dup")).when(trxCommissionRepository).saveAll(any());
+        List<TrxCommission> expectedRows = List.of(mock(TrxCommission.class), mock(TrxCommission.class));
+        List<CompleteTransactionResponse.LineCommission> expectedLineResponses = List.of(
+                CompleteTransactionResponse.LineCommission.builder().build());
+        when(commissionService.calculate(any(), any(), any(), any()))
+                .thenReturn(new CommissionService.CalculationResult(expectedRows, expectedLineResponses));
+        doThrow(new AppException(TransactionErrorCode.TRX_9999)).when(commissionService).saveAll(any());
 
         // Act
         AppException ex = assertThrows(AppException.class,
@@ -689,7 +746,7 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
@@ -799,7 +856,7 @@ class TransactionServiceTest {
         Page<TrxTransaction> page =
                 new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
@@ -815,7 +872,7 @@ class TransactionServiceTest {
         Page<TrxTransaction> page =
                 new PageImpl<>(List.of(), PageRequest.of(0, 10), 7);
         when(trxTransactionRepository.findByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
 
         var result = transactionService.listTransactions(sellerId, "SELLER", "COMPLETED", 0, 10);
 
@@ -828,7 +885,7 @@ class TransactionServiceTest {
         Page<TrxTransaction> page =
                 new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
         when(trxTransactionRepository.findByUserIdAndTrxStatus(eq(sellerId), eq("PENDING"), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(3L);
 
         var result = transactionService.listTransactions(sellerId, "SELLER", "PENDING", 0, 10);
@@ -906,8 +963,7 @@ class TransactionServiceTest {
                 .build();
         when(trxCommissionRepository.findAllByItemIdIn(List.of(itemA, itemB)))
                 .thenReturn(List.of(commA, commB));
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(
-                eq(sellerId), eq("AGENT_FEE")))
+        when(commissionService.sumAgentFeeFor(eq(sellerId)))
                 .thenReturn(new BigDecimal("27000"));
 
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED")))
@@ -1071,7 +1127,7 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(agentCommission, superAgentCommission));
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
@@ -1100,7 +1156,7 @@ class TransactionServiceTest {
     void list_WhenBeneficiaryRoleAndCompletedStatus_ShouldUseTotalElementsForCount() {
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 5);
         when(trxTransactionRepository.findTransactionsBenefitingUser(eq(sellerId), eq("COMPLETED"), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
 
         var result = transactionService.listTransactions(sellerId, "BENEFICIARY", "COMPLETED", 0, 10);
 
@@ -1114,7 +1170,7 @@ class TransactionServiceTest {
         Page<TrxTransaction> page = new PageImpl<>(List.of(trxInPage), PageRequest.of(0, 10), 1);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of());
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
@@ -1127,7 +1183,7 @@ class TransactionServiceTest {
     void list_WhenRoleIsNull_ShouldDefaultToSeller() {
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactions(sellerId, null, null, 0, 10);
@@ -1140,7 +1196,7 @@ class TransactionServiceTest {
     void list_WhenSellerRoleExplicitlyUppercase_ShouldUseAsIs() {
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
@@ -1165,7 +1221,7 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(superAgentCommission));
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countCompletedTransactionsBenefitingUser(eq(sellerId))).thenReturn(0L);
 
         var result = transactionService.listTransactions(sellerId, "BENEFICIARY", null, 0, 10);
@@ -1178,7 +1234,7 @@ class TransactionServiceTest {
     void list_WhenStatusIsBlank_ShouldDefaultToNullStatus() {
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactions(sellerId, "SELLER", "", 0, 10);
@@ -1196,7 +1252,7 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         TransactionListResponseV2 result = transactionService.listTransactionsV2(sellerId, "SELLER", null, 0, 10);
@@ -1250,7 +1306,7 @@ class TransactionServiceTest {
     void listV2_WhenSizeIsZeroOrNegative_ShouldNormalizeTo20() {
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
@@ -1264,7 +1320,7 @@ class TransactionServiceTest {
     void listV2_WhenPageIsNegative_ShouldNormalizeTo0() {
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
@@ -1278,7 +1334,7 @@ class TransactionServiceTest {
     void listV2_WhenEmptyResultPage_ShouldReturnEmptyItemsAndZeroTotals() {
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactionsV2(sellerId, "SELLER", null, 0, 10);
@@ -1293,7 +1349,7 @@ class TransactionServiceTest {
     void listV2_WhenStatusFilterIsCompletedAndSellerRole_ShouldUseTotalElementsForCount() {
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 7);
         when(trxTransactionRepository.findByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
 
         var result = transactionService.listTransactionsV2(sellerId, "SELLER", "COMPLETED", 0, 10);
 
@@ -1305,7 +1361,7 @@ class TransactionServiceTest {
     void listV2_WhenBeneficiaryRoleAndCompletedStatus_ShouldUseTotalElementsForCount() {
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 5);
         when(trxTransactionRepository.findTransactionsBenefitingUser(eq(sellerId), eq("COMPLETED"), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
 
         var result = transactionService.listTransactionsV2(sellerId, "BENEFICIARY", "COMPLETED", 0, 10);
 
@@ -1318,7 +1374,7 @@ class TransactionServiceTest {
         Page<TrxTransaction> page = new PageImpl<>(List.of(trx), PageRequest.of(0, 10), 1);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of());
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactionsV2(sellerId, "SELLER", null, 0, 10);
@@ -1341,7 +1397,7 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(itemA, itemB));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactionsV2(sellerId, "SELLER", null, 0, 10);
@@ -1359,7 +1415,7 @@ class TransactionServiceTest {
         Page<TrxTransaction> page = new PageImpl<>(List.of(trx), PageRequest.of(0, 10), 1);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of());
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactionsV2(sellerId, "SELLER", null, 0, 10);
@@ -1386,7 +1442,7 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(superAgentCommission));
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countCompletedTransactionsBenefitingUser(eq(sellerId))).thenReturn(0L);
 
         var result = transactionService.listTransactionsV2(sellerId, "BENEFICIARY", null, 0, 10);
@@ -1421,7 +1477,7 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(agentCommission, agentCommissionExcluded));
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countCompletedTransactionsBenefitingUser(eq(sellerId))).thenReturn(0L);
 
         var result = transactionService.listTransactionsV2(sellerId, "BENEFICIARY", null, 0, 10);
@@ -1457,7 +1513,7 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(agentCommission, agentCommissionExcluded));
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactionsV2(sellerId, "SELLER", null, 0, 10);
@@ -1483,7 +1539,7 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(superAgentCommission));
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactionsV2(sellerId, "SELLER", null, 0, 10);
@@ -1495,7 +1551,7 @@ class TransactionServiceTest {
     void listV2_WhenRoleIsBlankOrNull_ShouldDefaultToSeller() {
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var blankResult = transactionService.listTransactionsV2(sellerId, "", null, 0, 10);
@@ -1512,7 +1568,7 @@ class TransactionServiceTest {
         // S6 stricter version for V2: blank status must route to the no-status repo method
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactionsV2(sellerId, "SELLER", "", 0, 10);
@@ -1526,52 +1582,41 @@ class TransactionServiceTest {
 
     @Test
     void completeTransaction_WhenHappyPath_ShouldSnapshotCorrectCommissionAmounts() {
-        // S4: verify the actual saved commission rows — math, types, beneficiaries, snapshot %
+        // S4: verify commission calculation delegates to CommissionService
         when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
         when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
         when(userRepository.findById(uplineId)).thenReturn(Optional.of(upline));
-        when(trxCommissionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        List<TrxCommission> expectedRows = List.of(mock(TrxCommission.class), mock(TrxCommission.class));
+        List<CompleteTransactionResponse.LineCommission> expectedLineResponses = List.of(
+                CompleteTransactionResponse.LineCommission.builder()
+                        .itemId(item.getItemId())
+                        .productName(product.getProductName())
+                        .profit(item.getProfit())
+                        .agentFeePercentage(product.getAgentFee())
+                        .agentFeeAmount(new BigDecimal("500.00"))
+                        .superAgentFeePercentage(product.getSuperAgentFee())
+                        .superAgentFeeAmount(new BigDecimal("250.00"))
+                        .build());
+        when(commissionService.calculate(any(), any(), any(), any()))
+                .thenReturn(new CommissionService.CalculationResult(expectedRows, expectedLineResponses));
+        when(commissionService.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(trxTransactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        transactionService.completeTransaction(sellerId, trxId);
+        CompleteTransactionResponse result = transactionService.completeTransaction(sellerId, trxId);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<TrxCommission>> captor = ArgumentCaptor.forClass(List.class);
-        verify(trxCommissionRepository).saveAll(captor.capture());
-        List<TrxCommission> saved = captor.getValue();
-        assertEquals(2, saved.size());
-
-        TrxCommission agent = saved.stream()
-                .filter(c -> "AGENT_FEE".equals(c.getCommissionType()))
-                .findFirst().orElseThrow();
-        TrxCommission superAgent = saved.stream()
-                .filter(c -> "SUPER_AGENT_FEE".equals(c.getCommissionType()))
-                .findFirst().orElseThrow();
-
-        // profit=5000, agentFee=10% → 500.00; superAgentFee=5% → 250.00
-        assertEquals(0, new BigDecimal("500.00").compareTo(agent.getCommissionAmount()));
-        assertEquals(0, new BigDecimal("250.00").compareTo(superAgent.getCommissionAmount()));
-
-        // feePercentage snapshotted from product (rule 9)
-        assertEquals(0, new BigDecimal("10.00").compareTo(agent.getFeePercentage()));
-        assertEquals(0, new BigDecimal("5.00").compareTo(superAgent.getFeePercentage()));
-
-        // AGENT_FEE: beneficiary=seller, source=seller
-        assertEquals(sellerId, agent.getBeneficiaryId());
-        assertEquals(sellerId, agent.getSourceUserId());
-        assertEquals(item.getItemId(), agent.getItemId());
-
-        // SUPER_AGENT_FEE: beneficiary=upline, source=seller
-        assertEquals(uplineId, superAgent.getBeneficiaryId());
-        assertEquals(sellerId, superAgent.getSourceUserId());
-        assertEquals(item.getItemId(), superAgent.getItemId());
+        verify(commissionService).calculate(any(), any(), any(), any());
+        assertEquals(2, result.getCommissionsCreated());
+        assertEquals(1, result.getCommissions().size());
+        assertEquals(0, new BigDecimal("500.00").compareTo(result.getCommissions().get(0).getAgentFeeAmount()));
+        assertEquals(0, new BigDecimal("250.00").compareTo(result.getCommissions().get(0).getSuperAgentFeeAmount()));
     }
 
     @Test
     void completeTransaction_WhenItemQuantityIsLarge_ShouldMultiplyAndRoundCommissions() {
-        // S5: qty=7 → profit = (50000-45000) * 7 = 35000; agent 10% → 3500.00; superAgent 5% → 1750.00
+        // S5: verify commission delegation works with multi-qty item
         TrxItem multiQtyItem = TrxItem.builder()
                 .itemId(UUID.randomUUID())
                 .trxId(trxId)
@@ -1585,23 +1630,30 @@ class TransactionServiceTest {
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
         when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
         when(userRepository.findById(uplineId)).thenReturn(Optional.of(upline));
-        when(trxCommissionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        List<TrxCommission> expectedRows = List.of(mock(TrxCommission.class), mock(TrxCommission.class));
+        List<CompleteTransactionResponse.LineCommission> expectedLineResponses = List.of(
+                CompleteTransactionResponse.LineCommission.builder()
+                        .itemId(multiQtyItem.getItemId())
+                        .productName(product.getProductName())
+                        .profit(multiQtyItem.getProfit())
+                        .agentFeePercentage(product.getAgentFee())
+                        .agentFeeAmount(new BigDecimal("3500.00"))
+                        .superAgentFeePercentage(product.getSuperAgentFee())
+                        .superAgentFeeAmount(new BigDecimal("1750.00"))
+                        .build());
+        when(commissionService.calculate(any(), any(), any(), any()))
+                .thenReturn(new CommissionService.CalculationResult(expectedRows, expectedLineResponses));
+        when(commissionService.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(trxTransactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        transactionService.completeTransaction(sellerId, trxId);
+        CompleteTransactionResponse result = transactionService.completeTransaction(sellerId, trxId);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<TrxCommission>> captor = ArgumentCaptor.forClass(List.class);
-        verify(trxCommissionRepository).saveAll(captor.capture());
-        List<TrxCommission> saved = captor.getValue();
-        TrxCommission agent = saved.stream()
-                .filter(c -> "AGENT_FEE".equals(c.getCommissionType()))
-                .findFirst().orElseThrow();
-        TrxCommission superAgent = saved.stream()
-                .filter(c -> "SUPER_AGENT_FEE".equals(c.getCommissionType()))
-                .findFirst().orElseThrow();
-        assertEquals(0, new BigDecimal("3500.00").compareTo(agent.getCommissionAmount()));
-        assertEquals(0, new BigDecimal("1750.00").compareTo(superAgent.getCommissionAmount()));
+        verify(commissionService).calculate(any(), any(), any(), any());
+        assertEquals(2, result.getCommissionsCreated());
+        assertEquals(1, result.getCommissions().size());
+        assertEquals(0, new BigDecimal("3500.00").compareTo(result.getCommissions().get(0).getAgentFeeAmount()));
+        assertEquals(0, new BigDecimal("1750.00").compareTo(result.getCommissions().get(0).getSuperAgentFeeAmount()));
     }
 
     // ==================== Group 10: create edge cases (S2 + S3) ====================
@@ -1671,7 +1723,7 @@ class TransactionServiceTest {
         // S6 stricter version for V1
         Page<TrxTransaction> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
         when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactions(sellerId, "SELLER", "", 0, 10);
@@ -1736,7 +1788,7 @@ class TransactionServiceTest {
         when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
         when(productRepository.findAllById(any())).thenReturn(List.of()); // product not returned
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
-        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndCommissionType(eq(sellerId), any())).thenReturn(BigDecimal.ZERO);
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
         when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
         var result = transactionService.listTransactionsV2(sellerId, "SELLER", null, 0, 10);
