@@ -13,6 +13,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,12 +29,30 @@ public class AuditService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveLog(UUID actorId, AuditAction action, EntityType entityType, UUID entityId, String payload, String auditStatus, String ipAddress, String userAgent) {
+        if (ipAddress == null || userAgent == null) {
+            try {
+                ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attributes != null) {
+                    HttpServletRequest request = attributes.getRequest();
+                    if (ipAddress == null) ipAddress = request.getRemoteAddr();
+                    if (userAgent == null) userAgent = request.getHeader("User-Agent");
+                }
+            } catch (Exception e) {
+                // Ignore if not running within a HTTP request context
+            }
+        }
+
+        String jsonPayload = payload;
+        if (payload != null && !payload.trim().startsWith("{") && !payload.trim().startsWith("[")) {
+            jsonPayload = "{\"message\":\"" + payload.replace("\"", "\\\"") + "\"}";
+        }
+
         SysAuditLog auditLog = SysAuditLog.builder()
                 .actorId(actorId)
                 .action(action)
                 .entityType(entityType)
                 .entityId(entityId)
-                .payload(payload)
+                .payload(jsonPayload)
                 .auditStatus(auditStatus != null ? auditStatus : "SUCCESS")
                 .ipAddress(ipAddress)
                 .userAgent(userAgent)

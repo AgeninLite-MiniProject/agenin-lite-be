@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,20 +25,23 @@ public class AdminProductController {
     private final ProductService productService;
 
     @PostMapping
-    public ResponseEntity<ProductResponseDto> createProduct(@Valid @RequestBody ProductCreateRequestDto request) {
-        ProductResponseDto response = productService.createProduct(request);
+    public ResponseEntity<ProductResponseDto> createProduct(Principal principal, @Valid @RequestBody ProductCreateRequestDto request) {
+        UUID actorId = UUID.fromString(principal.getName());
+        ProductResponseDto response = productService.createProduct(actorId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/{productId}/update")
-    public ResponseEntity<ProductResponseDto> updateProduct(@PathVariable UUID productId, @RequestBody ProductUpdateRequestDto request) {
-        ProductResponseDto response = productService.updateProduct(productId, request);
+    public ResponseEntity<ProductResponseDto> updateProduct(Principal principal, @PathVariable UUID productId, @RequestBody ProductUpdateRequestDto request) {
+        UUID actorId = UUID.fromString(principal.getName());
+        ProductResponseDto response = productService.updateProduct(actorId, productId, request);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{productId}/inactive")
-    public ResponseEntity<ProductResponseDto> setProductInactive(@PathVariable UUID productId) {
-        ProductResponseDto response = productService.setProductInactive(productId);
+    public ResponseEntity<ProductResponseDto> setProductInactive(Principal principal, @PathVariable UUID productId) {
+        UUID actorId = UUID.fromString(principal.getName());
+        ProductResponseDto response = productService.setProductInactive(actorId, productId);
         return ResponseEntity.ok(response);
     }
 

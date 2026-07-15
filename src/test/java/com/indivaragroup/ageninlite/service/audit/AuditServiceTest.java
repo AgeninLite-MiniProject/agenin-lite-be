@@ -10,6 +10,8 @@ import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +25,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -73,6 +77,11 @@ class AuditServiceTest {
                 .build();
     }
 
+    @AfterEach
+    void tearDown() {
+        RequestContextHolder.resetRequestAttributes();
+    }
+
     @Test
     void saveLog_WithCustomStatus_Success() {
         auditService.saveLog(actorId, AuditAction.REGISTER, EntityType.USER, entityId,
@@ -85,7 +94,7 @@ class AuditServiceTest {
         assertEquals(AuditAction.REGISTER, savedLog.getAction());
         assertEquals(EntityType.USER, savedLog.getEntityType());
         assertEquals(entityId, savedLog.getEntityId());
-        assertEquals("payload", savedLog.getPayload());
+        assertEquals("{\"message\":\"payload\"}", savedLog.getPayload());
         assertEquals("FAILED", savedLog.getAuditStatus());
         assertEquals("192.168.1.1", savedLog.getIpAddress());
         assertEquals("Chrome", savedLog.getUserAgent());
@@ -101,6 +110,126 @@ class AuditServiceTest {
 
         assertEquals("SUCCESS", savedLog.getAuditStatus());
         assertEquals(AuditAction.TRANSACTION_CREATE, savedLog.getAction());
+        assertEquals("192.168.1.2", savedLog.getIpAddress());
+        assertEquals("Firefox", savedLog.getUserAgent());
+    }
+
+    @Test
+    void saveLog_WithNullIpAndUserAgent_FetchesFromRequestContext() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRemoteAddr()).thenReturn("10.0.0.1");
+        when(request.getHeader("User-Agent")).thenReturn("PostmanRuntime/7.29.0");
+
+        ServletRequestAttributes attributes = new ServletRequestAttributes(request);
+        RequestContextHolder.setRequestAttributes(attributes);
+
+        auditService.saveLog(actorId, AuditAction.LOGIN, EntityType.USER, entityId,
+                "payload3", "SUCCESS", null, null);
+
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        SysAuditLog savedLog = auditLogCaptor.getValue();
+
+        assertEquals("10.0.0.1", savedLog.getIpAddress());
+        assertEquals("PostmanRuntime/7.29.0", savedLog.getUserAgent());
+    }
+
+    @Test
+    void saveLog_WithNullIpAndUserAgent_AndNoRequestContext_IgnoresAndLeavesNull() {
+        RequestContextHolder.resetRequestAttributes();
+
+        auditService.saveLog(actorId, AuditAction.LOGIN, EntityType.USER, entityId,
+                "payload4", "SUCCESS", null, null);
+
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        SysAuditLog savedLog = auditLogCaptor.getValue();
+
+        assertEquals(null, savedLog.getIpAddress());
+        assertEquals(null, savedLog.getUserAgent());
+    }
+
+    @Test
+    void saveLog_WithNullIpAndUserAgent_AndExceptionInContext_IgnoresAndLeavesNull() {
+        // Simulating attributes != null but throwing exception on getRequest
+        ServletRequestAttributes attributes = mock(ServletRequestAttributes.class);
+        when(attributes.getRequest()).thenThrow(new RuntimeException("Simulated exception"));
+        RequestContextHolder.setRequestAttributes(attributes);
+
+        auditService.saveLog(actorId, AuditAction.LOGIN, EntityType.USER, entityId,
+                "payload5", "SUCCESS", null, null);
+
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        SysAuditLog savedLog = auditLogCaptor.getValue();
+
+        assertEquals(null, savedLog.getIpAddress());
+        assertEquals(null, savedLog.getUserAgent());
+    }
+
+    @Test
+    void saveLog_WithIpNotNullButUserAgentNull() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeader("User-Agent")).thenReturn("PostmanRuntime/7.29.0");
+
+        ServletRequestAttributes attributes = new ServletRequestAttributes(request);
+        RequestContextHolder.setRequestAttributes(attributes);
+
+        auditService.saveLog(actorId, AuditAction.LOGIN, EntityType.USER, entityId,
+                "payload", "SUCCESS", "10.0.0.1", null);
+
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        SysAuditLog savedLog = auditLogCaptor.getValue();
+
+        assertEquals("10.0.0.1", savedLog.getIpAddress()); // Should remain the same
+        assertEquals("PostmanRuntime/7.29.0", savedLog.getUserAgent()); // Should be fetched
+    }
+
+    @Test
+    void saveLog_WithIpNullButUserAgentNotNull() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRemoteAddr()).thenReturn("10.0.0.1");
+
+        ServletRequestAttributes attributes = new ServletRequestAttributes(request);
+        RequestContextHolder.setRequestAttributes(attributes);
+
+        auditService.saveLog(actorId, AuditAction.LOGIN, EntityType.USER, entityId,
+                "payload", "SUCCESS", null, "ExistingAgent");
+
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        SysAuditLog savedLog = auditLogCaptor.getValue();
+
+        assertEquals("10.0.0.1", savedLog.getIpAddress()); // Should be fetched
+        assertEquals("ExistingAgent", savedLog.getUserAgent()); // Should remain the same
+    }
+
+    @Test
+    void saveLog_WithNullPayload() {
+        auditService.saveLog(actorId, AuditAction.REGISTER, EntityType.USER, entityId,
+                null, "SUCCESS", "1.1.1.1", "Agent");
+
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        SysAuditLog savedLog = auditLogCaptor.getValue();
+        assertEquals(null, savedLog.getPayload());
+    }
+
+    @Test
+    void saveLog_WithJsonPayloadObject() {
+        String jsonObject = "{\"key\":\"value\"}";
+        auditService.saveLog(actorId, AuditAction.REGISTER, EntityType.USER, entityId,
+                jsonObject, "SUCCESS", "1.1.1.1", "Agent");
+
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        SysAuditLog savedLog = auditLogCaptor.getValue();
+        assertEquals(jsonObject, savedLog.getPayload());
+    }
+
+    @Test
+    void saveLog_WithJsonPayloadArray() {
+        String jsonArray = "[1, 2, 3]";
+        auditService.saveLog(actorId, AuditAction.REGISTER, EntityType.USER, entityId,
+                jsonArray, "SUCCESS", "1.1.1.1", "Agent");
+
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        SysAuditLog savedLog = auditLogCaptor.getValue();
+        assertEquals(jsonArray, savedLog.getPayload());
     }
 
     @Test

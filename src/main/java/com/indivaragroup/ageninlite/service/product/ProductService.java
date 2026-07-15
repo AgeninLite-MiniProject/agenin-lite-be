@@ -7,6 +7,9 @@ import com.indivaragroup.ageninlite.dto.product.ProductResponseDto;
 import com.indivaragroup.ageninlite.dto.product.ProductUpdateRequestDto;
 import com.indivaragroup.ageninlite.entity.MstProduct;
 import com.indivaragroup.ageninlite.repository.product.ProductRepository;
+import com.indivaragroup.ageninlite.common.enums.AuditAction;
+import com.indivaragroup.ageninlite.common.enums.EntityType;
+import com.indivaragroup.ageninlite.service.audit.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,9 +27,10 @@ import lombok.extern.slf4j.Slf4j;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final AuditService auditService;
 
     @Transactional
-    public ProductResponseDto createProduct(ProductCreateRequestDto request) {
+    public ProductResponseDto createProduct(UUID actorId, ProductCreateRequestDto request) {
         log.info("Process create product with name: {}", request.getProduct_name());
 
         validatePricingAndFee(request.getCost_price(), request.getSelling_price(), request.getAgent_fee(), request.getSuper_agent_fee());
@@ -39,6 +43,8 @@ public class ProductService {
                 .build();
 
         MstProduct savedProduct = productRepository.save(newProduct);
+
+        auditService.saveLog(actorId, AuditAction.PRODUCT_SAVED, EntityType.PRODUCT, savedProduct.getProductId(), "Created product " + savedProduct.getProductName(), "SUCCESS", null, null);
 
         return ProductResponseDto.builder()
                 .product_id(savedProduct.getProductId())
@@ -53,7 +59,7 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductResponseDto updateProduct(UUID productId, ProductUpdateRequestDto request) {
+    public ProductResponseDto updateProduct(UUID actorId, UUID productId, ProductUpdateRequestDto request) {
         log.info("Process update product with ID: {}", productId);
 
         MstProduct product = productRepository.findById(productId)
@@ -83,6 +89,8 @@ public class ProductService {
 
         MstProduct updatedProduct = productRepository.save(product);
 
+        auditService.saveLog(actorId, AuditAction.PRODUCT_SAVED, EntityType.PRODUCT, updatedProduct.getProductId(), "Updated product " + updatedProduct.getProductName(), "SUCCESS", null, null);
+
         return ProductResponseDto.builder()
                 .product_id(updatedProduct.getProductId())
                 .product_name(updatedProduct.getProductName())
@@ -96,7 +104,7 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductResponseDto setProductInactive(UUID productId) {
+    public ProductResponseDto setProductInactive(UUID actorId, UUID productId) {
         log.info("Process set inactive for product with ID: {}", productId);
 
         MstProduct product = productRepository.findById(productId)
@@ -104,6 +112,8 @@ public class ProductService {
 
         product.setProductStatus("INACTIVE");
         productRepository.save(product);
+
+        auditService.saveLog(actorId, AuditAction.PRODUCT_SAVED, EntityType.PRODUCT, product.getProductId(), "Deactivated product " + product.getProductName(), "SUCCESS", null, null);
 
         return ProductResponseDto.builder()
                 .product_id(product.getProductId())

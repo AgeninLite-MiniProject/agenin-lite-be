@@ -31,6 +31,9 @@ class CommissionServiceTest {
     @Mock
     private TrxCommissionRepository trxCommissionRepository;
 
+    @Mock
+    private com.indivaragroup.ageninlite.service.audit.AuditService auditService;
+
     private CommissionCalculator commissionCalculator;
     private CommissionService commissionService;
 
@@ -46,7 +49,7 @@ class CommissionServiceTest {
     @BeforeEach
     void setUp() {
         commissionCalculator = new CommissionCalculator();
-        commissionService = new CommissionService(trxCommissionRepository, commissionCalculator);
+        commissionService = new CommissionService(trxCommissionRepository, commissionCalculator, auditService);
 
         sellerId = UUID.randomUUID();
         uplineId = UUID.randomUUID();

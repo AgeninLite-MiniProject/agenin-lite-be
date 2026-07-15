@@ -48,6 +48,8 @@ class AuthServiceTest {
     private JwtUtil jwtUtil;
     @Mock
     private JwtBlacklistRepository jwtBlacklistRepository;
+    @Mock
+    private com.indivaragroup.ageninlite.service.audit.AuditService auditService;
 
     @InjectMocks
     private AuthService authService;

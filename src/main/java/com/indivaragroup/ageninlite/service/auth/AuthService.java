@@ -2,7 +2,10 @@ package com.indivaragroup.ageninlite.service.auth;
 
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.AuthErrorCode;
+import com.indivaragroup.ageninlite.common.enums.AuditAction;
+import com.indivaragroup.ageninlite.common.enums.EntityType;
 import com.indivaragroup.ageninlite.dto.auth.*;
+import com.indivaragroup.ageninlite.service.audit.AuditService;
 import com.indivaragroup.ageninlite.entity.AuthJwtBlacklist;
 import com.indivaragroup.ageninlite.entity.AuthRefreshToken;
 import com.indivaragroup.ageninlite.entity.MstUser;
@@ -31,6 +34,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final JwtBlacklistRepository jwtBlacklistRepository;
+    private final AuditService auditService;
 
     @Transactional
     public RegisterResponseDto register(RegisterRequestDto request) {
@@ -91,6 +95,8 @@ public class AuthService {
         MstUser savedUser = userRepository.save(newUser);
         log.info("User {} successfully registered with ID: {}", savedUser.getPhoneNumber(), savedUser.getUserId());
 
+        auditService.saveLog(savedUser.getUserId(), AuditAction.REGISTER, EntityType.USER, savedUser.getUserId(), "Registered via phone: " + request.getPhoneNumber(), "SUCCESS", null, null);
+
         return RegisterResponseDto.builder()
                 .userId(savedUser.getUserId())
                 .name(savedUser.getUserName())
@@ -117,6 +123,7 @@ public class AuthService {
         // 2. Cek Password
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             log.error("Login failed: Incorrect password for user {}", user.getUserId());
+            auditService.saveLog(user.getUserId(), AuditAction.LOGIN_FAILED, EntityType.USER, user.getUserId(), "Incorrect password for phone: " + request.getPhoneNumber(), "FAILURE", null, null);
             throw new AppException(AuthErrorCode.AUTH_0010);
         }
 
@@ -144,6 +151,8 @@ public class AuthService {
 
         refreshTokenRepository.save(refreshToken);
         log.info("Login successful for user {}", user.getUserId());
+
+        auditService.saveLog(user.getUserId(), AuditAction.LOGIN, EntityType.USER, user.getUserId(), "Login success for phone: " + request.getPhoneNumber(), "SUCCESS", null, null);
 
         return LoginResponseDto.builder()
                 .accessToken(accessToken)

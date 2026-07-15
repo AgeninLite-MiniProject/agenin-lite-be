@@ -41,6 +41,8 @@ class InvitationServiceTest {
 
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private com.indivaragroup.ageninlite.service.audit.AuditService auditService;
 
     @InjectMocks
     private InvitationService invitationService;

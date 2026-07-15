@@ -12,6 +12,9 @@ import com.indivaragroup.ageninlite.dto.invitation.SentInvitationItemDto;
 import com.indivaragroup.ageninlite.dto.invitation.ReceivedInvitationItemDto;
 import com.indivaragroup.ageninlite.dto.invitation.ReceivedInvitationListResponse;
 import com.indivaragroup.ageninlite.dto.invitation.SentInvitationListResponse;
+import com.indivaragroup.ageninlite.common.enums.AuditAction;
+import com.indivaragroup.ageninlite.common.enums.EntityType;
+import com.indivaragroup.ageninlite.service.audit.AuditService;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.entity.TrxInvitation;
 import com.indivaragroup.ageninlite.repository.auth.UserRepository;
@@ -49,6 +52,7 @@ public class InvitationService {
 
     private final TrxInvitationRepository invitationRepository;
     private final UserRepository userRepository;
+    private final AuditService auditService;
 
     @Transactional
     public InvitationResponse sendInvitation(UUID inviterId, SendInvitationRequest request) {
@@ -87,7 +91,7 @@ public class InvitationService {
             inv.setRespondedAt(null);
             inv.setCancelledAt(null);
             TrxInvitation saved = invitationRepository.save(inv);
-            // TODO: audit — action="INVITE_RESENT", payload={ inviterId, inviteeId, previousStatus }
+            auditService.saveLog(inviterId, AuditAction.INVITE_SENT, EntityType.INVITATION, saved.getInvitationId(), "Invitation resent to " + inviteeId, "SUCCESS", null, null);
 
             return buildInvitationResponse(inviterId, inviteeId, invitee, saved);
         }
@@ -100,8 +104,7 @@ public class InvitationService {
         TrxInvitation saved = invitationRepository.save(invitation);
         log.info("invitation sent inviterId={} inviteeId={} invitationId={}", inviterId, inviteeId, saved.getInvitationId());
 
-        // TODO: audit — call AuditService.log(actorId=inviterId, action="INVITE_SENT", entityType="INVITATION", entityId=saved.getInvitationId(), payload=...)
-        // Will be implemented when AuditService exists.
+        auditService.saveLog(inviterId, AuditAction.INVITE_SENT, EntityType.INVITATION, saved.getInvitationId(), "Invitation sent to " + inviteeId, "SUCCESS", null, null);
 
         return buildInvitationResponse(inviterId, inviteeId, invitee, saved);
     }
@@ -140,6 +143,8 @@ public class InvitationService {
         }
 
         log.info("invitation accepted inviterId={} inviteeId={} downlinerCount={}", inviterId, inviteeId, userRepository.countByReferredBy(inviterId));
+        auditService.saveLog(inviteeId, AuditAction.INVITE_ACCEPTED, EntityType.INVITATION, invitation.getInvitationId(), "Invitation accepted from " + inviterId, "SUCCESS", null, null);
+
         return AcceptInvitationResponse.builder()
                 .inviterId(inviterId)
                 .inviteeId(inviteeId)
@@ -156,7 +161,7 @@ public class InvitationService {
         TrxInvitation invitation = findPendingOrThrow(inviterId, inviteeId, InvitationErrorCode.INV_0014);
 
         markTerminal(invitation, STATUS_DECLINED);
-        // TODO: audit INVITE_DECLINED with payload { inviterId, inviteeId }
+        auditService.saveLog(inviteeId, AuditAction.INVITE_DECLINED, EntityType.INVITATION, invitation.getInvitationId(), "Invitation declined from " + inviterId, "SUCCESS", null, null);
 
         log.info("invitation declined inviterId={} inviteeId={}", inviterId, inviteeId);
         return DeclineInvitationResponse.builder()
@@ -178,7 +183,7 @@ public class InvitationService {
         }
 
         markTerminal(invitation, STATUS_CANCELLED);
-        // TODO: audit INVITE_CANCELLED with payload { inviterId, inviteeId }
+        auditService.saveLog(inviterId, AuditAction.INVITE_CANCELLED, EntityType.INVITATION, invitation.getInvitationId(), "Invitation cancelled to " + inviteeId, "SUCCESS", null, null);
 
         log.info("invitation cancelled inviterId={} inviteeId={}", inviterId, inviteeId);
         return CancelInvitationResponse.builder()
