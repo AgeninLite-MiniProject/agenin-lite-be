@@ -67,6 +67,9 @@ class TransactionServiceTest {
     @Mock
     private CommissionService commissionService;
 
+    @Mock
+    private com.indivaragroup.ageninlite.service.audit.AuditService auditService;
+
     @InjectMocks
     private TransactionService transactionService;
 

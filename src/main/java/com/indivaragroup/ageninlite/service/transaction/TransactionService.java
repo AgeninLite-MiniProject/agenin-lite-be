@@ -12,6 +12,9 @@ import com.indivaragroup.ageninlite.dto.transaction.TransactionListItemV2Dto;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionListResponse;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionListResponseV2;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionStatusUpdateResponse;
+import com.indivaragroup.ageninlite.common.enums.AuditAction;
+import com.indivaragroup.ageninlite.common.enums.EntityType;
+import com.indivaragroup.ageninlite.service.audit.AuditService;
 import com.indivaragroup.ageninlite.entity.MstProduct;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.entity.TrxCommission;
@@ -60,6 +63,7 @@ public class TransactionService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final CommissionService commissionService;
+    private final AuditService auditService;
 
     @Transactional
     public CompleteTransactionResponse completeTransaction(UUID requesterId, UUID trxId) {
@@ -139,11 +143,7 @@ public class TransactionService {
             userRepository.save(seller);
         }
 
-        // TODO: audit — action="TRANSACTION_COMPLETE", entityType="TRX_TRANSACTION",
-        //       entityId=savedTrx.getTrxId(), payload={ before: "PENDING", after: "COMPLETED" }
-        //       AND for each commission row: action="COMMISSION_PAYOUT",
-        //       entityType="TRX_COMMISSION", entityId=commissionId,
-        //       payload={ beneficiaryId, type, amount }
+        auditService.saveLog(requesterId, AuditAction.TRANSACTION_COMPLETE, EntityType.TRANSACTION, savedTrx.getTrxId(), "Transaction completed", "SUCCESS", null, null);
 
         log.info("completeTransaction succeeded trxId={} commissionsCreated={}", savedTrx.getTrxId(), totalRowsCreated);
         return CompleteTransactionResponse.builder()
@@ -161,12 +161,12 @@ public class TransactionService {
 
     @Transactional
     public TransactionStatusUpdateResponse cancelTransaction(UUID requesterId, UUID trxId) {
-        return terminateTransaction(requesterId, trxId, STATUS_CANCELLED, "Transaction cancelled", "transaction cancelled");
+        return terminateTransaction(requesterId, trxId, STATUS_CANCELLED, "Transaction cancelled", "transaction cancelled", AuditAction.TRANSACTION_CANCELLED, "SUCCESS");
     }
 
     @Transactional
     public TransactionStatusUpdateResponse failTransaction(UUID requesterId, UUID trxId) {
-        return terminateTransaction(requesterId, trxId, STATUS_FAILED, "Transaction failed", "transaction failed");
+        return terminateTransaction(requesterId, trxId, STATUS_FAILED, "Transaction failed", "transaction failed", AuditAction.TRANSACTION_FAILED, "FAILURE");
     }
 
     private TransactionListItemDto buildListItem(
@@ -558,7 +558,7 @@ public class TransactionService {
 
     private TransactionStatusUpdateResponse terminateTransaction(
             UUID requesterId, UUID trxId, String newStatus,
-            String responseMessage, String logMessage) {
+            String responseMessage, String logMessage, AuditAction auditAction, String auditStatus) {
         TrxTransaction trx = trxTransactionRepository.findById(trxId)
                 .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
 
@@ -574,6 +574,7 @@ public class TransactionService {
         trxTransactionRepository.save(trx);
 
         log.info("{} trxId={} requesterId={}", logMessage, trxId, requesterId);
+        auditService.saveLog(requesterId, auditAction, EntityType.TRANSACTION, trxId, logMessage, auditStatus, null, null);
 
         return TransactionStatusUpdateResponse.builder()
                 .trxId(trxId)
@@ -661,9 +662,7 @@ public class TransactionService {
         List<TrxItem> savedItems = trxItemRepository.saveAll(itemsToSave);
 
         // === Step 8: build response ===
-        // TODO: audit — action="TRANSACTION_CREATE", entityType="TRX_TRANSACTION",
-        //       entityId=trxId, payload={ userId, totalAmount, itemCount }
-        // Will be implemented when AuditService exists.
+        auditService.saveLog(sellerId, AuditAction.TRANSACTION_CREATE, EntityType.TRANSACTION, trxId, "Transaction created with " + savedItems.size() + " items", "SUCCESS", null, null);
 
         List<CreateTransactionResponse.TransactionItemResponse> itemResponses =
                 savedItems.stream()

@@ -7,6 +7,9 @@ import com.indivaragroup.ageninlite.dto.admin.UserDeleteResponseDto;
 import com.indivaragroup.ageninlite.dto.admin.UserSearchResponseDto;
 import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.repository.auth.UserRepository;
+import com.indivaragroup.ageninlite.common.enums.AuditAction;
+import com.indivaragroup.ageninlite.common.enums.EntityType;
+import com.indivaragroup.ageninlite.service.audit.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -25,6 +28,7 @@ import java.util.UUID;
 public class AdminUserService {
 
     private final UserRepository userRepository;
+    private final AuditService auditService;
 
     @Transactional(readOnly = true)
     public PaginatedResponseDto<UserSearchResponseDto> searchUsers(String query, String status, Boolean isDeleted, int page, int size) {
@@ -64,6 +68,8 @@ public class AdminUserService {
         user.setDeleted(true);
         user.setDeletedAt(LocalDateTime.now());
         userRepository.save(user);
+
+        auditService.saveLog(currentAdminId, AuditAction.USER_DELETED, EntityType.USER, targetUserId, "Admin deleted user " + targetUserId, "SUCCESS", null, null);
 
         return UserDeleteResponseDto.builder()
                 .message("User soft-deleted successfully")

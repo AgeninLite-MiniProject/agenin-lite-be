@@ -8,6 +8,9 @@ import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.entity.TrxCommission;
 import com.indivaragroup.ageninlite.entity.TrxItem;
 import com.indivaragroup.ageninlite.repository.transaction.TrxCommissionRepository;
+import com.indivaragroup.ageninlite.common.enums.AuditAction;
+import com.indivaragroup.ageninlite.common.enums.EntityType;
+import com.indivaragroup.ageninlite.service.audit.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -29,6 +32,7 @@ public class CommissionService {
 
     private final TrxCommissionRepository trxCommissionRepository;
     private final CommissionCalculator commissionCalculator;
+    private final AuditService auditService;
 
     public CalculationResult calculate(
             List<TrxItem> items,
@@ -86,7 +90,20 @@ public class CommissionService {
             return List.of();
         }
         try {
-            return trxCommissionRepository.saveAll(rows);
+            List<TrxCommission> saved = trxCommissionRepository.saveAll(rows);
+            for (TrxCommission comm : saved) {
+                auditService.saveLog(
+                    comm.getBeneficiaryId(), 
+                    AuditAction.COMMISSION_PAYOUT, 
+                    EntityType.COMMISSION, 
+                    comm.getCommissionId(), 
+                    "Commission payout of type " + comm.getCommissionType() + " with amount " + comm.getCommissionAmount(), 
+                    "SUCCESS", 
+                    null, 
+                    null
+                );
+            }
+            return saved;
         } catch (DataIntegrityViolationException e) {
             log.warn("TRX_9999 commission integrity violation rows={}", rows.size(), e);
             throw new AppException(TransactionErrorCode.TRX_9999);

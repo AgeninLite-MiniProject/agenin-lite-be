@@ -16,12 +16,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
+import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,7 +42,9 @@ class AdminProductControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private UUID productId;
+    private UUID actorId;
     private ProductResponseDto mockResponse;
+    private Principal mockPrincipal;
 
     @BeforeEach
     void setUp() {
@@ -49,12 +53,16 @@ class AdminProductControllerTest {
                 .build();
 
         productId = UUID.randomUUID();
+        actorId = UUID.randomUUID();
         mockResponse = ProductResponseDto.builder()
                 .product_id(productId)
                 .product_name("Teh Pucuk")
                 .product_status("ACTIVE")
                 .message("Success")
                 .build();
+        
+        mockPrincipal = mock(Principal.class);
+        org.mockito.Mockito.lenient().when(mockPrincipal.getName()).thenReturn(actorId.toString());
     }
 
     @Test
@@ -66,9 +74,10 @@ class AdminProductControllerTest {
         request.setAgent_fee(new BigDecimal("10.00"));
         request.setSuper_agent_fee(new BigDecimal("5.00"));
 
-        when(productService.createProduct(any(ProductCreateRequestDto.class))).thenReturn(mockResponse);
+        when(productService.createProduct(eq(actorId), any(ProductCreateRequestDto.class))).thenReturn(mockResponse);
 
         mockMvc.perform(post("/api/admin/products")
+                .principal(mockPrincipal)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -86,6 +95,7 @@ class AdminProductControllerTest {
         request.setSuper_agent_fee(new BigDecimal("5.00"));
 
         mockMvc.perform(post("/api/admin/products")
+                .principal(mockPrincipal)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -101,6 +111,7 @@ class AdminProductControllerTest {
         request.setSuper_agent_fee(new BigDecimal("5.00"));
 
         mockMvc.perform(post("/api/admin/products")
+                .principal(mockPrincipal)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -112,9 +123,10 @@ class AdminProductControllerTest {
         ProductUpdateRequestDto request = new ProductUpdateRequestDto();
         request.setProduct_name("Kopi ABC");
 
-        when(productService.updateProduct(eq(productId), any(ProductUpdateRequestDto.class))).thenReturn(mockResponse);
+        when(productService.updateProduct(eq(actorId), eq(productId), any(ProductUpdateRequestDto.class))).thenReturn(mockResponse);
 
         mockMvc.perform(post("/api/admin/products/{productId}/update", productId)
+                .principal(mockPrincipal)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -123,9 +135,10 @@ class AdminProductControllerTest {
 
     @Test
     void setProductInactive_Success() throws Exception {
-        when(productService.setProductInactive(productId)).thenReturn(mockResponse);
+        when(productService.setProductInactive(eq(actorId), eq(productId))).thenReturn(mockResponse);
 
-        mockMvc.perform(post("/api/admin/products/{productId}/inactive", productId))
+        mockMvc.perform(post("/api/admin/products/{productId}/inactive", productId)
+                .principal(mockPrincipal))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.product_status").value("ACTIVE"));
     }

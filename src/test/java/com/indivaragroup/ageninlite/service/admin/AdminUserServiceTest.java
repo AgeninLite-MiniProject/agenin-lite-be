@@ -33,6 +33,9 @@ class AdminUserServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.indivaragroup.ageninlite.service.audit.AuditService auditService;
+
     @InjectMocks
     private AdminUserService adminUserService;
 

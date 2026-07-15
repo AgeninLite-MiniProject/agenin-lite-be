@@ -29,14 +29,20 @@ class ProductServiceTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private com.indivaragroup.ageninlite.service.audit.AuditService auditService;
+
     @InjectMocks
     private ProductService productService;
+
+    private UUID actorId;
 
     private UUID productId;
     private MstProduct mockProduct;
 
     @BeforeEach
     void setUp() {
+        actorId = UUID.randomUUID();
         productId = UUID.randomUUID();
         mockProduct = MstProduct.builder()
                 .productId(productId)
@@ -60,7 +66,7 @@ class ProductServiceTest {
 
         when(productRepository.save(any(MstProduct.class))).thenReturn(mockProduct);
 
-        ProductResponseDto response = productService.createProduct(request);
+        ProductResponseDto response = productService.createProduct(actorId, request);
 
         assertNotNull(response);
         assertEquals(productId, response.getProduct_id());
@@ -82,7 +88,7 @@ class ProductServiceTest {
         when(productRepository.findById(productId)).thenReturn(Optional.of(mockProduct));
         when(productRepository.save(any(MstProduct.class))).thenReturn(mockProduct);
 
-        ProductResponseDto response = productService.updateProduct(productId, request);
+        ProductResponseDto response = productService.updateProduct(actorId, productId, request);
 
         assertNotNull(response);
         assertEquals("Product updated successfully", response.getMessage());
@@ -101,7 +107,7 @@ class ProductServiceTest {
         when(productRepository.findById(productId)).thenReturn(Optional.of(mockProduct));
         when(productRepository.save(any(MstProduct.class))).thenReturn(mockProduct);
 
-        ProductResponseDto response = productService.updateProduct(productId, request);
+        ProductResponseDto response = productService.updateProduct(actorId, productId, request);
 
         assertNotNull(response);
         assertEquals("Teh Pucuk", mockProduct.getProductName());
@@ -115,7 +121,7 @@ class ProductServiceTest {
         when(productRepository.findById(productId)).thenReturn(Optional.empty());
 
         AppException exception = assertThrows(AppException.class, () -> {
-            productService.updateProduct(productId, request);
+            productService.updateProduct(actorId, productId, request);
         });
 
         assertEquals(ProductErrorCode.PRD_0002, exception.getErrorCode());
@@ -127,7 +133,7 @@ class ProductServiceTest {
         when(productRepository.findById(productId)).thenReturn(Optional.of(mockProduct));
         when(productRepository.save(any(MstProduct.class))).thenReturn(mockProduct);
 
-        ProductResponseDto response = productService.setProductInactive(productId);
+        ProductResponseDto response = productService.setProductInactive(actorId, productId);
 
         assertNotNull(response);
         assertEquals("Product set to inactive successfully", response.getMessage());
@@ -142,7 +148,7 @@ class ProductServiceTest {
         when(productRepository.findById(productId)).thenReturn(Optional.empty());
 
         AppException exception = assertThrows(AppException.class, () -> {
-            productService.setProductInactive(productId);
+            productService.setProductInactive(actorId, productId);
         });
 
         assertEquals(ProductErrorCode.PRD_0002, exception.getErrorCode());
@@ -193,7 +199,7 @@ class ProductServiceTest {
         request.setSuper_agent_fee(new BigDecimal("5.00"));
 
         AppException exception = assertThrows(AppException.class, () -> {
-            productService.createProduct(request);
+            productService.createProduct(actorId, request);
         });
 
         assertEquals(ProductErrorCode.PRD_0009, exception.getErrorCode());
@@ -210,7 +216,7 @@ class ProductServiceTest {
         request.setSuper_agent_fee(new BigDecimal("50.00"));
 
         AppException exception = assertThrows(AppException.class, () -> {
-            productService.createProduct(request);
+            productService.createProduct(actorId, request);
         });
 
         assertEquals(ProductErrorCode.PRD_0010, exception.getErrorCode());
@@ -226,7 +232,7 @@ class ProductServiceTest {
         when(productRepository.findById(productId)).thenReturn(Optional.of(mockProduct));
 
         AppException exception = assertThrows(AppException.class, () -> {
-            productService.updateProduct(productId, request);
+            productService.updateProduct(actorId, productId, request);
         });
 
         assertEquals(ProductErrorCode.PRD_0009, exception.getErrorCode());
@@ -242,7 +248,7 @@ class ProductServiceTest {
         when(productRepository.findById(productId)).thenReturn(Optional.of(mockProduct));
 
         AppException exception = assertThrows(AppException.class, () -> {
-            productService.updateProduct(productId, request);
+            productService.updateProduct(actorId, productId, request);
         });
 
         assertEquals(ProductErrorCode.PRD_0010, exception.getErrorCode());
