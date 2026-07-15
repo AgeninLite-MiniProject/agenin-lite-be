@@ -5,6 +5,7 @@ import com.indivaragroup.ageninlite.common.exception.code.DownlinerErrorCode;
 import com.indivaragroup.ageninlite.dto.downline.AgentDetailDto;
 import com.indivaragroup.ageninlite.dto.downline.DownlineDetailResponseDto;
 import com.indivaragroup.ageninlite.dto.downline.DownlineTransactionHistoryDto;
+import com.indivaragroup.ageninlite.dto.downline.DownlineTransactionItemDto;
 import com.indivaragroup.ageninlite.entity.*;
 import com.indivaragroup.ageninlite.repository.auth.UserRepository;
 import com.indivaragroup.ageninlite.repository.product.ProductRepository;
@@ -92,27 +93,28 @@ public class DownlinerService {
             for (TrxTransaction trx : transactions) {
                 List<TrxItem> trxItems = itemsByTrx.getOrDefault(trx.getTrxId(), new ArrayList<>());
 
-                int totalQty = trxItems.stream().mapToInt(TrxItem::getQuantity).sum();
+                List<DownlineTransactionItemDto> itemDtos = new ArrayList<>();
+                BigDecimal totalCommissionEarned = BigDecimal.ZERO;
 
-                String displayProductName = "No Item";
-                if (!trxItems.isEmpty()) {
-                    displayProductName = productNames.getOrDefault(trxItems.get(0).getProductId(), "Unknown");
-                    if (trxItems.size() > 1) {
-                        displayProductName += " dan " + (trxItems.size() - 1) + " lainnya";
-                    }
+                for (TrxItem item : trxItems) {
+                    BigDecimal itemCommission = commissionsMap.getOrDefault(item.getItemId(), BigDecimal.ZERO);
+                    totalCommissionEarned = totalCommissionEarned.add(itemCommission);
+                    
+                    itemDtos.add(DownlineTransactionItemDto.builder()
+                            .productName(productNames.getOrDefault(item.getProductId(), "Unknown"))
+                            .quantity(item.getQuantity())
+                            .amount(item.getItemAmount())
+                            .commissionEarned(itemCommission)
+                            .build());
                 }
-                BigDecimal commissionEarned = trxItems.stream()
-                        .map(i -> commissionsMap.getOrDefault(i.getItemId(), BigDecimal.ZERO))
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
                 historyList.add(DownlineTransactionHistoryDto.builder()
                         .trxId(trx.getTrxId())
-                        .productName(displayProductName)
-                        .quantity(totalQty)
+                        .items(itemDtos)
                         .amount(trx.getTotalAmount())
                         .status(trx.getTrxStatus())
                         .completedAt(trx.getCompletedAt())
-                        .commissionEarned(commissionEarned)
-                        .superAgentFeeAmount(commissionEarned)
+                        .totalCommissionEarned(totalCommissionEarned)
                         .build());
             }
         }

@@ -145,9 +145,13 @@ class DownlinerServiceTest {
         assertEquals(downlinerId, response.getAgentDetail().getUserId());
         assertEquals(new BigDecimal("15000"), response.getProfitIncomeFromAgent());
         assertEquals(1, response.getContent().size());
-        assertEquals("Product A", response.getContent().get(0).getProductName());
-        assertEquals(2, response.getContent().get(0).getQuantity());
-        assertEquals(new BigDecimal("5000"), response.getContent().get(0).getCommissionEarned());
+        
+        DownlineTransactionHistoryDto history1 = response.getContent().get(0);
+        assertEquals(1, history1.getItems().size());
+        assertEquals("Product A", history1.getItems().get(0).getProductName());
+        assertEquals(2, history1.getItems().get(0).getQuantity());
+        assertEquals(new BigDecimal("5000"), history1.getItems().get(0).getCommissionEarned());
+        assertEquals(new BigDecimal("5000"), history1.getTotalCommissionEarned());
         
         verify(userRepository).findById(downlinerId);
     }
@@ -287,16 +291,18 @@ class DownlinerServiceTest {
         
         // Assert trx1 (has multiple items)
         DownlineTransactionHistoryDto history1 = response.getContent().get(0);
-        assertEquals("Product A dan 1 lainnya", history1.getProductName());
-        assertEquals(3, history1.getQuantity()); // 2 + 1
-        assertEquals(new BigDecimal("5000"), history1.getSuperAgentFeeAmount());
+        assertEquals(2, history1.getItems().size());
+        assertEquals("Product A", history1.getItems().get(0).getProductName());
+        assertEquals(2, history1.getItems().get(0).getQuantity());
+        assertEquals(new BigDecimal("5000"), history1.getItems().get(0).getCommissionEarned());
+        assertEquals("Unknown", history1.getItems().get(1).getProductName());
+        assertEquals(1, history1.getItems().get(1).getQuantity());
+        assertEquals(new BigDecimal("5000"), history1.getTotalCommissionEarned());
 
-        // Assert trx2 (has NO items) — superAgentFeeAmount must be ZERO, not null
+        // Assert trx2 (has NO items)
         DownlineTransactionHistoryDto history2 = response.getContent().get(1);
-        assertEquals("No Item", history2.getProductName());
-        assertEquals(0, history2.getQuantity());
-        assertEquals(BigDecimal.ZERO, history2.getCommissionEarned());
-        assertEquals(BigDecimal.ZERO, history2.getSuperAgentFeeAmount());
+        assertEquals(0, history2.getItems().size());
+        assertEquals(BigDecimal.ZERO, history2.getTotalCommissionEarned());
     }
 
     @Test
@@ -345,10 +351,9 @@ class DownlinerServiceTest {
         assertNotNull(response);
         assertEquals(1, response.getContent().size());
         DownlineTransactionHistoryDto row = response.getContent().get(0);
-        assertEquals(expectedFee, row.getCommissionEarned(),
-                "Pre-existing field must still match");
-        assertEquals(expectedFee, row.getSuperAgentFeeAmount(),
-                "New field must equal the pre-existing field (same data, new name)");
+        assertEquals(1, row.getItems().size());
+        assertEquals(expectedFee, row.getItems().get(0).getCommissionEarned());
+        assertEquals(expectedFee, row.getTotalCommissionEarned());
     }
 
     @Test
@@ -389,8 +394,8 @@ class DownlinerServiceTest {
                 requesterId, downlinerId, pageable);
 
         DownlineTransactionHistoryDto row = response.getContent().get(0);
-        assertEquals(BigDecimal.ZERO, row.getCommissionEarned());
-        assertEquals(BigDecimal.ZERO, row.getSuperAgentFeeAmount(),
-                "No-commission case must zero the new field, not return null");
+        assertEquals(1, row.getItems().size());
+        assertEquals(BigDecimal.ZERO, row.getItems().get(0).getCommissionEarned());
+        assertEquals(BigDecimal.ZERO, row.getTotalCommissionEarned());
     }
 }
