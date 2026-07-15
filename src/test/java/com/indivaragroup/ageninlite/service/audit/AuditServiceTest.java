@@ -2,7 +2,7 @@ package com.indivaragroup.ageninlite.service.audit;
 
 import com.indivaragroup.ageninlite.common.enums.AuditAction;
 import com.indivaragroup.ageninlite.common.enums.EntityType;
-import com.indivaragroup.ageninlite.dto.audit.AuditLogResponse;
+import com.indivaragroup.ageninlite.dto.audit.AuditLogResponseDto;
 import com.indivaragroup.ageninlite.entity.SysAuditLog;
 import com.indivaragroup.ageninlite.repository.audit.AuditLogRepository;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -111,13 +111,13 @@ class AuditServiceTest {
                 .thenReturn(new PageImpl<>(List.of(sampleLog)));
 
         // Act
-        Page<AuditLogResponse> result = auditService.getAuditLogs(
+        Page<AuditLogResponseDto> result = auditService.getAuditLogs(
                 actorId, AuditAction.REGISTER, EntityType.USER, "SUCCESS", pageable);
 
         // Assert
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
-        AuditLogResponse dto = result.getContent().get(0);
+        AuditLogResponseDto dto = result.getContent().get(0);
         assertEquals(actorId, dto.getActorId());
         assertEquals("REGISTER", dto.getAction());
         assertEquals("USER", dto.getEntityType());
@@ -161,7 +161,7 @@ class AuditServiceTest {
                 .thenReturn(new PageImpl<>(List.of(sampleLog)));
 
         // Act
-        Page<AuditLogResponse> result = auditService.getAuditLogs(
+        Page<AuditLogResponseDto> result = auditService.getAuditLogs(
                 null, null, null, null, pageable);
 
         // Assert
@@ -191,7 +191,7 @@ class AuditServiceTest {
                 .thenReturn(new PageImpl<>(List.of(sampleLog)));
 
         // Act
-        Page<AuditLogResponse> result = auditService.getAuditLogs(
+        Page<AuditLogResponseDto> result = auditService.getAuditLogs(
                 null, null, null, "   ", pageable);
 
         // Assert

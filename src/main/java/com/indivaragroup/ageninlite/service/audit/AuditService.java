@@ -2,7 +2,7 @@ package com.indivaragroup.ageninlite.service.audit;
 
 import com.indivaragroup.ageninlite.common.enums.AuditAction;
 import com.indivaragroup.ageninlite.common.enums.EntityType;
-import com.indivaragroup.ageninlite.dto.audit.AuditLogResponse;
+import com.indivaragroup.ageninlite.dto.audit.AuditLogResponseDto;
 import com.indivaragroup.ageninlite.entity.SysAuditLog;
 import com.indivaragroup.ageninlite.repository.audit.AuditLogRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -41,7 +41,7 @@ public class AuditService {
     }
 
     @Transactional(readOnly = true)
-    public Page<AuditLogResponse> getAuditLogs(
+    public Page<AuditLogResponseDto> getAuditLogs(
             UUID actorId, AuditAction action, EntityType entityType,
             String auditStatus, Pageable pageable) {
 
@@ -66,7 +66,7 @@ public class AuditService {
         Page<SysAuditLog> auditLogs = auditLogRepository.findAll(spec, pageable);
 
         return auditLogs.map(log -> {
-            AuditLogResponse dto = new AuditLogResponse();
+            AuditLogResponseDto dto = new AuditLogResponseDto();
             dto.setAuditLogId(log.getAuditLogId());
             dto.setActorId(log.getActorId());
             dto.setAction(log.getAction().name());

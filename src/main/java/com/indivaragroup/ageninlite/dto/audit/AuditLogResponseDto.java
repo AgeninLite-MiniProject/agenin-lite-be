@@ -12,7 +12,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AuditLogResponse {
+public class AuditLogResponseDto {
     private UUID auditLogId;
     private UUID actorId;
     private String action;
