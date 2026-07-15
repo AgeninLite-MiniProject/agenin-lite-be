@@ -22,6 +22,7 @@ import com.indivaragroup.ageninlite.repository.product.ProductRepository;
 import com.indivaragroup.ageninlite.repository.transaction.TrxCommissionRepository;
 import com.indivaragroup.ageninlite.repository.transaction.TrxItemRepository;
 import com.indivaragroup.ageninlite.repository.transaction.TrxTransactionRepository;
+import com.indivaragroup.ageninlite.service.commission.CommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -53,14 +54,12 @@ public class TransactionService {
     private static final String STATUS_FAILED = "FAILED";
     private static final String USER_STATUS_PASSIVE = "PASSIVE";
     private static final String USER_STATUS_ACTIVE = "ACTIVE";
-    private static final String COMMISSION_TYPE_AGENT = "AGENT_FEE";
-    private static final String COMMISSION_TYPE_SUPER_AGENT = "SUPER_AGENT_FEE";
-
     private final TrxTransactionRepository trxTransactionRepository;
     private final TrxItemRepository trxItemRepository;
-    private final ProductRepository productRepository;
     private final TrxCommissionRepository trxCommissionRepository;
+    private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final CommissionService commissionService;
 
     @Transactional
     public CompleteTransactionResponse completeTransaction(UUID requesterId, UUID trxId) {
@@ -110,11 +109,12 @@ public class TransactionService {
 
         boolean isFirstCompletion = isFirstCompletedTransaction(seller);
 
-        //check if seller has an upline
+        //check if seller has an upline (caller resolves — option A)
         UUID uplineId = seller.getReferredBy();
+        MstUser upline = null;
         String superAgentName = null;
         if (uplineId != null) {
-            MstUser upline = userRepository.findById(uplineId).orElse(null);
+            upline = userRepository.findById(uplineId).orElse(null);
             if (upline != null) {
                 superAgentName = upline.getUserName();
             } else {
@@ -122,63 +122,12 @@ public class TransactionService {
             }
         }
 
-        List<TrxCommission> commissionsToSave = new ArrayList<>();
-        List<CompleteTransactionResponse.LineCommission> lineResponses = new ArrayList<>();
-        int totalRowsCreated = 0;
-
-        for (TrxItem item : items) {
-            MstProduct product = productById.get(item.getProductId());
-
-            /*
-            * for each item in transaction, calculate agent fee and super agent fee
-            * insert into a list
-            * the list is used later to insert altogether into commissions table
-            * not one-by-one
-            * */
-            BigDecimal agentFeeAmount = calculateCommissionAmount(item.getProfit(), product.getAgentFee());
-            commissionsToSave.add(TrxCommission.builder()
-                    .itemId(item.getItemId())
-                    .beneficiaryId(seller.getUserId())
-                    .sourceUserId(seller.getUserId())
-                    .commissionType(COMMISSION_TYPE_AGENT)
-                    .feePercentage(product.getAgentFee())
-                    .commissionAmount(agentFeeAmount)
-                    .build());
-            totalRowsCreated++;
-
-            BigDecimal superAgentFeeAmount = BigDecimal.ZERO;
-            if (uplineId != null) {
-                superAgentFeeAmount = calculateCommissionAmount(item.getProfit(), product.getSuperAgentFee());
-                commissionsToSave.add(TrxCommission.builder()
-                        .itemId(item.getItemId())
-                        .beneficiaryId(uplineId)
-                        .sourceUserId(seller.getUserId())
-                        .commissionType(COMMISSION_TYPE_SUPER_AGENT)
-                        .feePercentage(product.getSuperAgentFee())
-                        .commissionAmount(superAgentFeeAmount)
-                        .build());
-                totalRowsCreated++;
-            }
-
-            //this is for the json response, each item have their own response
-            lineResponses.add(CompleteTransactionResponse.LineCommission.builder()
-                    .itemId(item.getItemId())
-                    .productName(product.getProductName())
-                    .profit(item.getProfit())
-                    .agentFeePercentage(product.getAgentFee())
-                    .agentFeeAmount(agentFeeAmount)
-                    .superAgentFeePercentage(product.getSuperAgentFee())
-                    .superAgentFeeAmount(superAgentFeeAmount)
-                    .build());
-        }
-
-        //insert into table trx commissions
-        try {
-            trxCommissionRepository.saveAll(commissionsToSave);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            log.warn("TRX_9999 commission integrity violation trxId={}", trxId, e);
-            throw new AppException(TransactionErrorCode.TRX_9999);
-        }
+        // Delegate the entire commission block
+        CommissionService.CalculationResult calc =
+                commissionService.calculate(items, productById, seller, upline);
+        List<TrxCommission> savedCommissions = commissionService.saveAll(calc.rowsToSave());
+        int totalRowsCreated = savedCommissions.size();
+        List<CompleteTransactionResponse.LineCommission> lineResponses = calc.lineResponses();
 
         trx.setTrxStatus(STATUS_COMPLETED);
         trx.setCompletedAt(java.time.LocalDateTime.now());
@@ -247,23 +196,13 @@ public class TransactionService {
                 .map(TrxItem::getItemId)
                 .collect(Collectors.toSet());
 
-        BigDecimal agentFeeAmount = commissions.stream()
-                .filter(c -> itemIds.contains(c.getItemId()))
-                .filter(c -> COMMISSION_TYPE_AGENT.equals(c.getCommissionType()))
-                .filter(c -> ROLE_SELLER.equals(viewerRole)
-                        ? viewerId.equals(c.getSourceUserId())
-                        : viewerId.equals(c.getBeneficiaryId()))
-                .map(TrxCommission::getCommissionAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal agentFeeAmount = commissionService.sumForViewer(
+                commissions, itemIds, CommissionService.COMMISSION_TYPE_AGENT,
+                viewerId, viewerRole);
 
-        BigDecimal superAgentFeeAmount = commissions.stream()
-                .filter(c -> itemIds.contains(c.getItemId()))
-                .filter(c -> COMMISSION_TYPE_SUPER_AGENT.equals(c.getCommissionType()))
-                .filter(c -> ROLE_SELLER.equals(viewerRole)
-                        ? viewerId.equals(c.getSourceUserId())
-                        : viewerId.equals(c.getBeneficiaryId()))
-                .map(TrxCommission::getCommissionAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal superAgentFeeAmount = commissionService.sumForViewer(
+                commissions, itemIds, CommissionService.COMMISSION_TYPE_SUPER_AGENT,
+                viewerId, viewerRole);
 
         return TransactionListItemDto.builder()
                 .id(trx.getTrxId())
@@ -345,8 +284,7 @@ public class TransactionService {
                     .toList();
         }
 
-        BigDecimal totalAgentFee = trxCommissionRepository
-                .sumCommissionAmountByBeneficiaryIdAndCommissionType(requesterId, COMMISSION_TYPE_AGENT);
+        BigDecimal totalAgentFee = commissionService.sumAgentFeeFor(requesterId);
         BigDecimal totalCommission = totalAgentFee != null ? totalAgentFee : BigDecimal.ZERO;
 
         long completedCount;
@@ -442,8 +380,7 @@ public class TransactionService {
                     .toList();
         }
 
-        BigDecimal totalAgentFee = trxCommissionRepository
-                .sumCommissionAmountByBeneficiaryIdAndCommissionType(requesterId, COMMISSION_TYPE_AGENT);
+        BigDecimal totalAgentFee = commissionService.sumAgentFeeFor(requesterId);
         BigDecimal totalCommission = totalAgentFee != null ? totalAgentFee : BigDecimal.ZERO;
 
         long completedCount;
@@ -501,23 +438,13 @@ public class TransactionService {
                 .map(TrxItem::getItemId)
                 .collect(Collectors.toSet());
 
-        BigDecimal agentFeeAmount = commissions.stream()
-                .filter(c -> itemIds.contains(c.getItemId()))
-                .filter(c -> COMMISSION_TYPE_AGENT.equals(c.getCommissionType()))
-                .filter(c -> ROLE_SELLER.equals(viewerRole)
-                        ? viewerId.equals(c.getSourceUserId())
-                        : viewerId.equals(c.getBeneficiaryId()))
-                .map(TrxCommission::getCommissionAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal agentFeeAmount = commissionService.sumForViewer(
+                commissions, itemIds, CommissionService.COMMISSION_TYPE_AGENT,
+                viewerId, viewerRole);
 
-        BigDecimal superAgentFeeAmount = commissions.stream()
-                .filter(c -> itemIds.contains(c.getItemId()))
-                .filter(c -> COMMISSION_TYPE_SUPER_AGENT.equals(c.getCommissionType()))
-                .filter(c -> ROLE_SELLER.equals(viewerRole)
-                        ? viewerId.equals(c.getSourceUserId())
-                        : viewerId.equals(c.getBeneficiaryId()))
-                .map(TrxCommission::getCommissionAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal superAgentFeeAmount = commissionService.sumForViewer(
+                commissions, itemIds, CommissionService.COMMISSION_TYPE_SUPER_AGENT,
+                viewerId, viewerRole);
 
         int totalQuantity = items.stream()
                 .mapToInt(TrxItem::getQuantity)
@@ -619,13 +546,6 @@ public class TransactionService {
                 .sellerName(seller.getUserName())
                 .items(itemResponses)
                 .build();
-    }
-
-    private BigDecimal calculateCommissionAmount(BigDecimal profit, BigDecimal feePercentage) {
-        return profit
-                .multiply(feePercentage)
-                .setScale(2, RoundingMode.HALF_UP)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 
     private boolean isFirstCompletedTransaction(MstUser seller) {

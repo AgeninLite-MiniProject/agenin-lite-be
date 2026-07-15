@@ -289,10 +289,108 @@ class DownlinerServiceTest {
         DownlineTransactionHistoryDto history1 = response.getContent().get(0);
         assertEquals("Product A dan 1 lainnya", history1.getProductName());
         assertEquals(3, history1.getQuantity()); // 2 + 1
-        
-        // Assert trx2 (has NO items)
+        assertEquals(new BigDecimal("5000"), history1.getSuperAgentFeeAmount());
+
+        // Assert trx2 (has NO items) — superAgentFeeAmount must be ZERO, not null
         DownlineTransactionHistoryDto history2 = response.getContent().get(1);
         assertEquals("No Item", history2.getProductName());
         assertEquals(0, history2.getQuantity());
+        assertEquals(BigDecimal.ZERO, history2.getCommissionEarned());
+        assertEquals(BigDecimal.ZERO, history2.getSuperAgentFeeAmount());
+    }
+
+    @Test
+    void getDownlineDetail_PopulatesSuperAgentFeeAmountPerRow() {
+        Pageable pageable = PageRequest.of(0, 20);
+        UUID itemA = UUID.randomUUID();
+        BigDecimal expectedFee = new BigDecimal("5000");
+
+        when(userRepository.findById(downlinerId)).thenReturn(Optional.of(downliner));
+        when(trxTransactionRepository.findLastTransactionDateByUserId(downlinerId))
+                .thenReturn(LocalDateTime.now());
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndSourceUserIdAndCommissionType(
+                requesterId, downlinerId, "SUPER_AGENT_FEE"))
+                .thenReturn(new BigDecimal("15000"));
+
+        TrxTransaction trx = TrxTransaction.builder()
+                .trxId(trxId).userId(downlinerId)
+                .totalAmount(new BigDecimal("100000"))
+                .trxStatus("COMPLETED")
+                .completedAt(LocalDateTime.now())
+                .build();
+        when(trxTransactionRepository.findByUserIdOrderByCreatedAtDesc(downlinerId, pageable))
+                .thenReturn(new PageImpl<>(List.of(trx)));
+
+        TrxItem item = TrxItem.builder()
+                .itemId(itemA).trxId(trxId).productId(productId).quantity(2)
+                .build();
+        when(trxItemRepository.findByTrxIdIn(List.of(trxId))).thenReturn(List.of(item));
+
+        MstProduct product = MstProduct.builder()
+                .productId(productId).productName("Product A").build();
+        when(productRepository.findAllById(List.of(productId))).thenReturn(List.of(product));
+
+        TrxCommission commission = TrxCommission.builder()
+                .commissionId(UUID.randomUUID())
+                .itemId(itemA)
+                .commissionAmount(expectedFee)
+                .build();
+        when(trxCommissionRepository.findByBeneficiaryIdAndItemIdInAndCommissionType(
+                eq(requesterId), anyCollection(), eq("SUPER_AGENT_FEE")))
+                .thenReturn(List.of(commission));
+
+        DownlineDetailResponseDto response = downlinerService.getDownlineDetail(
+                requesterId, downlinerId, pageable);
+
+        assertNotNull(response);
+        assertEquals(1, response.getContent().size());
+        DownlineTransactionHistoryDto row = response.getContent().get(0);
+        assertEquals(expectedFee, row.getCommissionEarned(),
+                "Pre-existing field must still match");
+        assertEquals(expectedFee, row.getSuperAgentFeeAmount(),
+                "New field must equal the pre-existing field (same data, new name)");
+    }
+
+    @Test
+    void getDownlineDetail_TransactionWithNoSuperAgentFee_ZeroesSuperAgentFeeAmount() {
+        Pageable pageable = PageRequest.of(0, 20);
+        UUID itemA = UUID.randomUUID();
+
+        when(userRepository.findById(downlinerId)).thenReturn(Optional.of(downliner));
+        when(trxTransactionRepository.findLastTransactionDateByUserId(downlinerId))
+                .thenReturn(LocalDateTime.now());
+        when(trxCommissionRepository.sumCommissionAmountByBeneficiaryIdAndSourceUserIdAndCommissionType(
+                requesterId, downlinerId, "SUPER_AGENT_FEE"))
+                .thenReturn(BigDecimal.ZERO);
+
+        TrxTransaction trx = TrxTransaction.builder()
+                .trxId(trxId).userId(downlinerId)
+                .totalAmount(new BigDecimal("100000"))
+                .trxStatus("COMPLETED")
+                .completedAt(LocalDateTime.now())
+                .build();
+        when(trxTransactionRepository.findByUserIdOrderByCreatedAtDesc(downlinerId, pageable))
+                .thenReturn(new PageImpl<>(List.of(trx)));
+
+        TrxItem item = TrxItem.builder()
+                .itemId(itemA).trxId(trxId).productId(productId).quantity(2)
+                .build();
+        when(trxItemRepository.findByTrxIdIn(List.of(trxId))).thenReturn(List.of(item));
+
+        MstProduct product = MstProduct.builder()
+                .productId(productId).productName("Product A").build();
+        when(productRepository.findAllById(List.of(productId))).thenReturn(List.of(product));
+
+        when(trxCommissionRepository.findByBeneficiaryIdAndItemIdInAndCommissionType(
+                eq(requesterId), anyCollection(), eq("SUPER_AGENT_FEE")))
+                .thenReturn(Collections.emptyList());
+
+        DownlineDetailResponseDto response = downlinerService.getDownlineDetail(
+                requesterId, downlinerId, pageable);
+
+        DownlineTransactionHistoryDto row = response.getContent().get(0);
+        assertEquals(BigDecimal.ZERO, row.getCommissionEarned());
+        assertEquals(BigDecimal.ZERO, row.getSuperAgentFeeAmount(),
+                "No-commission case must zero the new field, not return null");
     }
 }
