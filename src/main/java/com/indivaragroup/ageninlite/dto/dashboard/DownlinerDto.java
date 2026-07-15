@@ -23,4 +23,7 @@ public class DownlinerDto {
     @JsonProperty("phone_number")
     private String phoneNumber;
 
+    @JsonProperty("user_status")
+    private String userStatus;
+
 }
