@@ -233,6 +233,19 @@ class AuditServiceTest {
     }
 
     @Test
+    void saveLogSync_Success() {
+        auditService.saveLogSync(actorId, AuditAction.REGISTER, EntityType.USER, entityId,
+                "payload sync", "SUCCESS", "127.0.0.1", "Browser");
+
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        SysAuditLog savedLog = auditLogCaptor.getValue();
+
+        assertEquals("SUCCESS", savedLog.getAuditStatus());
+        assertEquals(AuditAction.REGISTER, savedLog.getAction());
+        assertEquals("{\"message\":\"payload sync\"}", savedLog.getPayload());
+    }
+
+    @Test
     void getAuditLogs_WithAllFilters_Success() {
         // Arrange
         Pageable pageable = PageRequest.of(0, 10);

@@ -29,6 +29,15 @@ public class AuditService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveLog(UUID actorId, AuditAction action, EntityType entityType, UUID entityId, String payload, String auditStatus, String ipAddress, String userAgent) {
+        saveLogInternal(actorId, action, entityType, entityId, payload, auditStatus, ipAddress, userAgent);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void saveLogSync(UUID actorId, AuditAction action, EntityType entityType, UUID entityId, String payload, String auditStatus, String ipAddress, String userAgent) {
+        saveLogInternal(actorId, action, entityType, entityId, payload, auditStatus, ipAddress, userAgent);
+    }
+
+    private void saveLogInternal(UUID actorId, AuditAction action, EntityType entityType, UUID entityId, String payload, String auditStatus, String ipAddress, String userAgent) {
         if (ipAddress == null || userAgent == null) {
             try {
                 ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();

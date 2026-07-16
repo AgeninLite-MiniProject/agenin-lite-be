@@ -95,7 +95,7 @@ public class AuthService {
         MstUser savedUser = userRepository.save(newUser);
         log.info("User {} successfully registered with ID: {}", savedUser.getPhoneNumber(), savedUser.getUserId());
 
-        auditService.saveLog(savedUser.getUserId(), AuditAction.REGISTER, EntityType.USER, savedUser.getUserId(), "Registered via phone: " + request.getPhoneNumber(), "SUCCESS", null, null);
+        auditService.saveLogSync(savedUser.getUserId(), AuditAction.REGISTER, EntityType.USER, savedUser.getUserId(), "Registered via phone: " + request.getPhoneNumber(), "SUCCESS", null, null);
 
         return RegisterResponseDto.builder()
                 .userId(savedUser.getUserId())
