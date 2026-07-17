@@ -502,8 +502,10 @@ class TransactionServiceTest {
     @Test
     void createTransaction_WhenQuantityExceedsMax_ShouldThrowTrx0006() {
         // Arrange
+        // MAX_QUANTITY_PER_LINE = 10 (see TransactionService line 49). Use 11 so this
+        // test stays one above the limit if MAX is ever tuned to 20/50/etc.
         CreateTransactionRequest overLimitRequest = CreateTransactionRequest.builder()
-                .items(List.of(item(productId, 100_001)))
+                .items(List.of(item(productId, 11)))
                 .build();
 
         // Act
@@ -616,10 +618,12 @@ class TransactionServiceTest {
     }
 
     @Test
-    void createTransaction_WhenBoundaryQuantity100000_ShouldPass() {
+    void createTransaction_WhenQuantityAtMax_ShouldPass() {
         // Arrange
+        // MAX_QUANTITY_PER_LINE = 10 (see TransactionService line 49). 10 is the
+        // upper-bound success sentinel for the createTransaction guard.
         CreateTransactionRequest boundaryRequest = CreateTransactionRequest.builder()
-                .items(List.of(item(productId, 100_000)))
+                .items(List.of(item(productId, 10)))
                 .build();
 
         when(productRepository.findAllById(any())).thenReturn(List.of(product));
