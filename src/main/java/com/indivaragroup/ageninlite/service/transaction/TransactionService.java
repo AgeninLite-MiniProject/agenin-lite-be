@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TransactionService {
 
-    private static final int MAX_QUANTITY_PER_LINE = 100_000;
+    private static final int MAX_QUANTITY_PER_LINE = 10;
     private static final String ROLE_SELLER = "SELLER";
     private static final String ROLE_BENEFICIARY = "BENEFICIARY";
     private static final int MAX_PAGE_SIZE = 50;
