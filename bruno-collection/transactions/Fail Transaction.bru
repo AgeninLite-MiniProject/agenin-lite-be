@@ -1,0 +1,25 @@
+meta {
+  name: Fail Transaction
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/transactions/{{trxId}}/fail
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbG...LOyg
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+  trxId: e9d2f2b7-b9c3-40bb-99bc-97d1595847d5
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

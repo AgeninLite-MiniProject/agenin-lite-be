@@ -1,0 +1,25 @@
+meta {
+  name: Complete Transaction
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/transactions/{{trxId}}/complete
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzUxMiJ9.eyJqdGkiOiIwMjUzODQwMy1kNjUwLTQ5MjktOTJhYy0xZjJkYjUwNDdiZmYiLCJzdWIiOiIwMTdlNzU3YS1hMTYzLTRmYWEtYjNjNy0yOWJjODQ2MzBlMDYiLCJ0eXBlIjoiYWNjZXNzIiwicGhvbmUiOiIrNjI4MTIzNDQ0NDQ0Iiwicm9sZSI6IkFHRU5UIiwiaWF0IjoxNzg0MDI0MTIxLCJleHAiOjE3ODQwMjUwMjF9.cYwxll9WXlXafjK5wY1bOP9VcaV43MoNLb3zWWWlfdSNSlzMERKSSqFKUCqWJOh6WeGwYqeOnJ6Zn-vR2HJTww
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+  trxId: d512cbd4-058c-44f5-93d0-273660d096fb
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

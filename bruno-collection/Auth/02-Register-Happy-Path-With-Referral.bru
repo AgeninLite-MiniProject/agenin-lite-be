@@ -1,0 +1,25 @@
+meta {
+  name: 02 Register Happy Path With Referral
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Andi Supriadi",
+    "phone_number": "+6281234567891",
+    "email": "andi@mail.com",
+    "password": "password123",
+    "referral_code": "AGN-INV1"
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+}

@@ -1,0 +1,28 @@
+meta {
+  name: 08 Refresh Happy Path
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{base_url}}/api/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refresh_token": "{{refresh_token}}"
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+}
+
+script:post-response {
+  if (res.body && res.body.access_token) {
+    bru.setEnvVar("jwt_token", res.body.access_token);
+    bru.setEnvVar("refresh_token", res.body.refresh_token);
+  }
+}

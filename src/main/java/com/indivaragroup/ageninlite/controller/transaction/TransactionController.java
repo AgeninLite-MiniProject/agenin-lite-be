@@ -1,0 +1,124 @@
+package com.indivaragroup.ageninlite.controller.transaction;
+
+import com.indivaragroup.ageninlite.common.dto.ApiResponse;
+import com.indivaragroup.ageninlite.common.exception.AppException;
+import com.indivaragroup.ageninlite.common.exception.code.TransactionErrorCode;
+import com.indivaragroup.ageninlite.dto.transaction.CompleteTransactionResponse;
+import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionRequest;
+import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionDetailResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionListResponse;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionListResponseV2;
+import com.indivaragroup.ageninlite.dto.transaction.TransactionStatusUpdateResponse;
+import com.indivaragroup.ageninlite.service.transaction.TransactionService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/transactions")
+@RequiredArgsConstructor
+public class TransactionController {
+
+    private final TransactionService transactionService;
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<CreateTransactionResponse>> create(
+            @AuthenticationPrincipal String sellerId,
+            @Valid @RequestBody CreateTransactionRequest request){
+        UUID sellerUuid = UUID.fromString(sellerId);
+
+        CreateTransactionResponse response = transactionService.createTransaction(sellerUuid, request);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(new ApiResponse<>(true, "Transaction created", response));
+    }
+
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<ApiResponse<CompleteTransactionResponse>> complete(
+            @AuthenticationPrincipal String requesterId,
+            @PathVariable UUID id) {
+
+        UUID requesterUuid = UUID.fromString(requesterId);
+        CompleteTransactionResponse response = transactionService.completeTransaction(requesterUuid, id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Transaction completed", response));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<ApiResponse<TransactionStatusUpdateResponse>> cancel(
+            @AuthenticationPrincipal String requesterId,
+            @PathVariable UUID id) {
+
+        UUID requesterUuid = UUID.fromString(requesterId);
+        TransactionStatusUpdateResponse response = transactionService.cancelTransaction(requesterUuid, id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Transaction cancelled", response));
+    }
+
+    @PostMapping("/{id}/fail")
+    public ResponseEntity<ApiResponse<TransactionStatusUpdateResponse>> fail(
+            @AuthenticationPrincipal String requesterId,
+            @PathVariable UUID id) {
+
+        UUID requesterUuid = UUID.fromString(requesterId);
+        TransactionStatusUpdateResponse response = transactionService.failTransaction(requesterUuid, id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Transaction failed", response));
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<TransactionListResponse>> list(
+            @AuthenticationPrincipal String requesterId,
+            @RequestParam(defaultValue = "SELLER") String role,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (size > 50) {
+            throw new AppException(TransactionErrorCode.TRX_0015);
+        }
+
+        UUID requesterUuid = UUID.fromString(requesterId);
+        TransactionListResponse response = transactionService
+                .listTransactions(requesterUuid, role, status, page, size);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Transactions fetched", response));
+    }
+
+    @GetMapping(params = "v=2")
+    public ResponseEntity<ApiResponse<TransactionListResponseV2>> listV2(
+            @AuthenticationPrincipal String requesterId,
+            @RequestParam(defaultValue = "SELLER") String role,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        if (size > 50) {
+            throw new AppException(TransactionErrorCode.TRX_0015);
+        }
+
+        UUID requesterUuid = UUID.fromString(requesterId);
+        TransactionListResponseV2 response = transactionService
+                .listTransactionsV2(requesterUuid, role, status, page, size);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Transactions fetched", response));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<TransactionDetailResponse>> getDetail(
+            @AuthenticationPrincipal String requesterId,
+            @PathVariable UUID id) {
+
+        UUID requesterUuid = UUID.fromString(requesterId);
+        TransactionDetailResponse response = transactionService
+                .getTransactionDetail(requesterUuid, id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Transaction detail fetched", response));
+    }
+}

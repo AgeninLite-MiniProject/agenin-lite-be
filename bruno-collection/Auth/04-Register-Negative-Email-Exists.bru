@@ -1,0 +1,25 @@
+meta {
+  name: 04 Register Negative Email Exists
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/api/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Budi Clone",
+    "phone_number": "+6281234567892",
+    "email": "budi@mail.com",
+    "password": "password123",
+    "referral_code": ""
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+}

@@ -1,0 +1,29 @@
+meta {
+  name: 06 Login Happy Path
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/api/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone_number": "+628123322254",
+    "password": "password321"
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+}
+
+script:post-response {
+  if (res.body && res.body.data && res.body.data.accessToken) {
+    bru.setEnvVar("jwt_token", res.body.data.accessToken);
+    bru.setEnvVar("refresh_token", res.body.data.refreshToken);
+  }
+}

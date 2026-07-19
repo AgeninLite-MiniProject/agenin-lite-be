@@ -1,0 +1,24 @@
+meta {
+  name: List Sent
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/invitations/sent?status=PENDING&page=0&size=10
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzUxMiJ9.eyJqdGkiOiI3Mzc4MmM2MC04OTM2LTRjZWYtOTA0YS03NzI5YzlmNDc4MjQiLCJzdWIiOiI2Yzk0MzgxZi1kYjEzLTQwMmEtYWFiYy0wOTY3Y2JhYTM1NzgiLCJ0eXBlIjoiYWNjZXNzIiwicGhvbmUiOiIrNjI4MTIzMzIyMjU0Iiwicm9sZSI6IkFHRU5UIiwiaWF0IjoxNzgzOTIyMTYxLCJleHAiOjE3ODM5MjMwNjF9.4KcZV7ddSNFd0uoOtLDJYi_c_wL1pycY17vqlFBnfRg7y9liwXlz-zQS4nkgTQ8-hSJXtuW_rBBeVkRcw3vq6w
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

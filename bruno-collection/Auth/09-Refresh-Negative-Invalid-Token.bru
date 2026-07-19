@@ -1,0 +1,21 @@
+meta {
+  name: 09 Refresh Negative Invalid Token
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{base_url}}/api/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refresh_token": "eyJhbGciOiJIUzUxMiJ9.invalid.token"
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+}
