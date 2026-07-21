@@ -1,6 +1,7 @@
 package com.indivaragroup.ageninlite.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -23,7 +24,7 @@ public class RegisterRequestDto {
     private String email;
 
     @NotBlank(message = "AUTH_0003")
-    @Size(min = 8, max = 64, message = "AUTH_0002")
+    @Size(min = 8, max = 15, message = "AUTH_0002")
     @Pattern(regexp = "^(?=.*[a-zA-Z])(?=.*\\d).*$", message = "AUTH_0002")
     @JsonProperty("password")
     private String password;
