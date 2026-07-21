@@ -3,6 +3,9 @@ package com.indivaragroup.ageninlite.service.invitation;
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.InvitationErrorCode;
 import com.indivaragroup.ageninlite.common.utils.PhoneUtils;
+import com.indivaragroup.ageninlite.common.constants.PaginationConstants;
+import com.indivaragroup.ageninlite.common.enums.AuditOutcome;
+import com.indivaragroup.ageninlite.common.enums.InvitationStatus;
 import com.indivaragroup.ageninlite.dto.invitation.AcceptInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.CancelInvitationResponse;
 import com.indivaragroup.ageninlite.dto.invitation.DeclineInvitationResponse;
@@ -42,13 +45,6 @@ import java.util.stream.Collectors;
 public class InvitationService {
     private static final int MAX_PENDING_INVITES = 3;
     private static final int MAX_DOWNLINERS_PER_USER = 10;
-    private static final int MAX_PAGE_SIZE = 50;
-    private static final int DEFAULT_PAGE_SIZE = 10;
-    private static final String STATUS_PENDING = "PENDING";
-    private static final String STATUS_ACCEPTED = "ACCEPTED";
-    private static final String STATUS_EXPIRED = "EXPIRED";
-    private static final String STATUS_DECLINED = "DECLINED";
-    private static final String STATUS_CANCELLED = "CANCELLED";
 
     private final TrxInvitationRepository invitationRepository;
     private final UserRepository userRepository;
@@ -75,7 +71,7 @@ public class InvitationService {
             throw new AppException(InvitationErrorCode.INV_0004);
         }
 
-        long pendingCount = invitationRepository.countByInviterIdAndInvitationStatus(inviterId, STATUS_PENDING);
+        long pendingCount = invitationRepository.countByInviterIdAndInvitationStatus(inviterId, InvitationStatus.PENDING.name());
         if (pendingCount >= MAX_PENDING_INVITES) {
             throw new AppException(InvitationErrorCode.INV_0005);
         }
@@ -83,15 +79,15 @@ public class InvitationService {
         Optional<TrxInvitation> existing = invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId);
         if (existing.isPresent()) {
             TrxInvitation inv = existing.get();
-            if (STATUS_PENDING.equals(inv.getInvitationStatus())) {
+            if (InvitationStatus.PENDING.name().equals(inv.getInvitationStatus())) {
                 throw new AppException(InvitationErrorCode.INV_0003);
             }
             log.info("invitation resent inviterId={} inviteeId={} previousStatus={}", inviterId, inviteeId, inv.getInvitationStatus());
-            inv.setInvitationStatus(STATUS_PENDING);
+            inv.setInvitationStatus(InvitationStatus.PENDING.name());
             inv.setRespondedAt(null);
             inv.setCancelledAt(null);
             TrxInvitation saved = invitationRepository.save(inv);
-            auditService.saveLog(inviterId, AuditAction.INVITE_SENT, EntityType.INVITATION, saved.getInvitationId(), "Invitation resent to " + inviteeId, "SUCCESS", null, null);
+            auditService.saveLog(inviterId, AuditAction.INVITE_SENT, EntityType.INVITATION, saved.getInvitationId(), "Invitation resent to " + inviteeId, AuditOutcome.SUCCESS.name(), null, null);
 
             return buildInvitationResponse(inviterId, inviteeId, invitee, saved);
         }
@@ -99,12 +95,12 @@ public class InvitationService {
         TrxInvitation invitation = TrxInvitation.builder()
                 .inviterId(inviterId)
                 .inviteeId(inviteeId)
-                .invitationStatus(STATUS_PENDING)
+                .invitationStatus(InvitationStatus.PENDING.name())
                 .build();
         TrxInvitation saved = invitationRepository.save(invitation);
         log.info("invitation sent inviterId={} inviteeId={} invitationId={}", inviterId, inviteeId, saved.getInvitationId());
 
-        auditService.saveLog(inviterId, AuditAction.INVITE_SENT, EntityType.INVITATION, saved.getInvitationId(), "Invitation sent to " + inviteeId, "SUCCESS", null, null);
+        auditService.saveLog(inviterId, AuditAction.INVITE_SENT, EntityType.INVITATION, saved.getInvitationId(), "Invitation sent to " + inviteeId, AuditOutcome.SUCCESS.name(), null, null);
 
         return buildInvitationResponse(inviterId, inviteeId, invitee, saved);
     }
@@ -120,7 +116,7 @@ public class InvitationService {
 
         long inviterDownlinerCount = userRepository.countByReferredBy(inviterId);
         if (inviterDownlinerCount >= MAX_DOWNLINERS_PER_USER) {
-            invitation.setInvitationStatus(STATUS_EXPIRED);
+            invitation.setInvitationStatus(InvitationStatus.EXPIRED.name());
             invitationRepository.save(invitation);
             throw new AppException(InvitationErrorCode.INV_0010);
         }
@@ -128,27 +124,27 @@ public class InvitationService {
         invitee.setReferredBy(inviterId);
         userRepository.save(invitee);
 
-        markTerminal(invitation, STATUS_ACCEPTED);
+        markTerminal(invitation, InvitationStatus.ACCEPTED.name());
 
         List<TrxInvitation> otherPending = invitationRepository
-                .findAllByInviteeIdAndInvitationStatus(inviteeId, STATUS_PENDING)
+                .findAllByInviteeIdAndInvitationStatus(inviteeId, InvitationStatus.PENDING.name())
                 .stream()
                 .filter(inv -> !inv.getInviterId().equals(inviterId))
                 .toList();
 
         for (TrxInvitation other : otherPending) {
             log.info("competing invitation auto-expired inviteeId={} expiredInviterId={} acceptedInviterId={}", inviteeId, other.getInviterId(), inviterId);
-            other.setInvitationStatus(STATUS_EXPIRED);
+            other.setInvitationStatus(InvitationStatus.EXPIRED.name());
             invitationRepository.save(other);
         }
 
         log.info("invitation accepted inviterId={} inviteeId={} downlinerCount={}", inviterId, inviteeId, userRepository.countByReferredBy(inviterId));
-        auditService.saveLog(inviteeId, AuditAction.INVITE_ACCEPTED, EntityType.INVITATION, invitation.getInvitationId(), "Invitation accepted from " + inviterId, "SUCCESS", null, null);
+        auditService.saveLog(inviteeId, AuditAction.INVITE_ACCEPTED, EntityType.INVITATION, invitation.getInvitationId(), "Invitation accepted from " + inviterId, AuditOutcome.SUCCESS.name(), null, null);
 
         return AcceptInvitationResponse.builder()
                 .inviterId(inviterId)
                 .inviteeId(inviteeId)
-                .status(STATUS_ACCEPTED)
+                .status(InvitationStatus.ACCEPTED.name())
                 .respondedAt(invitation.getRespondedAt())
                 .referredBy(inviterId)
                 .cancelledCount(otherPending.size())
@@ -160,14 +156,14 @@ public class InvitationService {
     public DeclineInvitationResponse declineInvitation(UUID inviterId, UUID inviteeId) {
         TrxInvitation invitation = findPendingOrThrow(inviterId, inviteeId, InvitationErrorCode.INV_0014);
 
-        markTerminal(invitation, STATUS_DECLINED);
-        auditService.saveLog(inviteeId, AuditAction.INVITE_DECLINED, EntityType.INVITATION, invitation.getInvitationId(), "Invitation declined from " + inviterId, "SUCCESS", null, null);
+        markTerminal(invitation, InvitationStatus.DECLINED.name());
+        auditService.saveLog(inviteeId, AuditAction.INVITE_DECLINED, EntityType.INVITATION, invitation.getInvitationId(), "Invitation declined from " + inviterId, AuditOutcome.SUCCESS.name(), null, null);
 
         log.info("invitation declined inviterId={} inviteeId={}", inviterId, inviteeId);
         return DeclineInvitationResponse.builder()
                 .inviterId(inviterId)
                 .inviteeId(inviteeId)
-                .status(STATUS_DECLINED)
+                .status(InvitationStatus.DECLINED.name())
                 .respondedAt(invitation.getRespondedAt())
                 .message("Invitation declined")
                 .build();
@@ -178,18 +174,18 @@ public class InvitationService {
         TrxInvitation invitation = invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)
                 .orElseThrow(() -> new AppException(InvitationErrorCode.INV_0014));
 
-        if (!STATUS_PENDING.equals(invitation.getInvitationStatus())) {
+        if (!InvitationStatus.PENDING.name().equals(invitation.getInvitationStatus())) {
             throw new AppException(InvitationErrorCode.INV_0011);
         }
 
-        markTerminal(invitation, STATUS_CANCELLED);
-        auditService.saveLog(inviterId, AuditAction.INVITE_CANCELLED, EntityType.INVITATION, invitation.getInvitationId(), "Invitation cancelled to " + inviteeId, "SUCCESS", null, null);
+        markTerminal(invitation, InvitationStatus.CANCELLED.name());
+        auditService.saveLog(inviterId, AuditAction.INVITE_CANCELLED, EntityType.INVITATION, invitation.getInvitationId(), "Invitation cancelled to " + inviteeId, AuditOutcome.SUCCESS.name(), null, null);
 
         log.info("invitation cancelled inviterId={} inviteeId={}", inviterId, inviteeId);
         return CancelInvitationResponse.builder()
                 .inviterId(inviterId)
                 .inviteeId(inviteeId)
-                .status(STATUS_CANCELLED)
+                .status(InvitationStatus.CANCELLED.name())
                 .cancelledAt(invitation.getCancelledAt())
                 .message("Invitation cancelled")
                 .build();
@@ -199,13 +195,13 @@ public class InvitationService {
     public SentInvitationListResponse listSentInvitations(
             UUID inviterId, String status, int page, int size) {
 
-        String effectiveStatus = (status == null || status.isBlank()) ? STATUS_PENDING : status;
+        String effectiveStatus = (status == null || status.isBlank()) ? InvitationStatus.PENDING.name() : status;
 
-        if (size > MAX_PAGE_SIZE) {
+        if (size > PaginationConstants.MAX_PAGE_SIZE) {
             throw new AppException(InvitationErrorCode.INV_0020);
         }
         if (size <= 0) {
-            size = DEFAULT_PAGE_SIZE;
+            size = PaginationConstants.INVITATION_DEFAULT_PAGE_SIZE;
         }
         if (page < 0) {
             page = 0;
@@ -238,7 +234,7 @@ public class InvitationService {
                 .toList();
 
         long pendingCount = invitationRepository
-                .countByInviterIdAndInvitationStatus(inviterId, STATUS_PENDING);
+                .countByInviterIdAndInvitationStatus(inviterId, InvitationStatus.PENDING.name());
 
         return SentInvitationListResponse.builder()
                 .invitations(items)
@@ -251,13 +247,13 @@ public class InvitationService {
     public ReceivedInvitationListResponse listReceivedInvitations(
             UUID inviteeId, String status, int page, int size) {
 
-        String effectiveStatus = (status == null || status.isBlank()) ? STATUS_PENDING : status;
+        String effectiveStatus = (status == null || status.isBlank()) ? InvitationStatus.PENDING.name() : status;
 
-        if (size > MAX_PAGE_SIZE) {
+        if (size > PaginationConstants.MAX_PAGE_SIZE) {
             throw new AppException(InvitationErrorCode.INV_0020);
         }
         if (size <= 0) {
-            size = DEFAULT_PAGE_SIZE;
+            size = PaginationConstants.INVITATION_DEFAULT_PAGE_SIZE;
         }
         if (page < 0) {
             page = 0;
@@ -289,7 +285,7 @@ public class InvitationService {
                 .toList();
 
         long pendingCount = invitationRepository
-                .countByInviteeIdAndInvitationStatus(inviteeId, STATUS_PENDING);
+                .countByInviteeIdAndInvitationStatus(inviteeId, InvitationStatus.PENDING.name());
 
         return ReceivedInvitationListResponse.builder()
                 .invitations(items)
@@ -300,7 +296,7 @@ public class InvitationService {
     private TrxInvitation findPendingOrThrow(UUID inviterId, UUID inviteeId, InvitationErrorCode notFoundCode) {
         TrxInvitation invitation = invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)
                 .orElseThrow(() -> new AppException(notFoundCode));
-        if (!STATUS_PENDING.equals(invitation.getInvitationStatus())) {
+        if (!InvitationStatus.PENDING.name().equals(invitation.getInvitationStatus())) {
             throw new AppException(InvitationErrorCode.INV_0011);
         }
         return invitation;
@@ -308,7 +304,7 @@ public class InvitationService {
 
     private TrxInvitation markTerminal(TrxInvitation invitation, String newStatus) {
         invitation.setInvitationStatus(newStatus);
-        if (STATUS_CANCELLED.equals(newStatus)) {
+        if (InvitationStatus.CANCELLED.name().equals(newStatus)) {
             invitation.setCancelledAt(LocalDateTime.now());
         } else {
             invitation.setRespondedAt(LocalDateTime.now());

@@ -2,6 +2,13 @@ package com.indivaragroup.ageninlite.service.transaction;
 
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.TransactionErrorCode;
+import com.indivaragroup.ageninlite.common.constants.PaginationConstants;
+import com.indivaragroup.ageninlite.common.enums.AuditOutcome;
+import com.indivaragroup.ageninlite.common.enums.CommissionType;
+import com.indivaragroup.ageninlite.common.enums.ProductStatus;
+import com.indivaragroup.ageninlite.common.enums.TransactionStatus;
+import com.indivaragroup.ageninlite.common.enums.UserStatus;
+import com.indivaragroup.ageninlite.common.enums.ViewerRole;
 import com.indivaragroup.ageninlite.dto.transaction.CompleteTransactionResponse;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionRequest;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionResponse;
@@ -46,16 +53,7 @@ import java.util.stream.Collectors;
 public class TransactionService {
 
     private static final int MAX_QUANTITY_PER_LINE = 10;
-    private static final String ROLE_SELLER = "SELLER";
-    private static final String ROLE_BENEFICIARY = "BENEFICIARY";
-    private static final int MAX_PAGE_SIZE = 50;
-    private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final String STATUS_PENDING = "PENDING";
-    private static final String STATUS_COMPLETED = "COMPLETED";
-    private static final String STATUS_CANCELLED = "CANCELLED";
-    private static final String STATUS_FAILED = "FAILED";
-    private static final String USER_STATUS_PASSIVE = "PASSIVE";
-    private static final String USER_STATUS_ACTIVE = "ACTIVE";
+
     private final TrxTransactionRepository trxTransactionRepository;
     private final TrxItemRepository trxItemRepository;
     private final TrxCommissionRepository trxCommissionRepository;
@@ -78,7 +76,7 @@ public class TransactionService {
         }
 
         //status must be pending
-        if (!STATUS_PENDING.equals(trx.getTrxStatus())) {
+        if (!TransactionStatus.PENDING.name().equals(trx.getTrxStatus())) {
             throw new AppException(TransactionErrorCode.TRX_0011);
         }
 
@@ -101,7 +99,7 @@ public class TransactionService {
         //check each item product if its actually there and if its active
         for (TrxItem item : items) {
             MstProduct product = productById.get(item.getProductId());
-            if (product == null || !USER_STATUS_ACTIVE.equals(product.getProductStatus())) {
+            if (product == null || !ProductStatus.ACTIVE.name().equals(product.getProductStatus())) {
                 throw new AppException(TransactionErrorCode.TRX_0013);
             }
         }
@@ -132,17 +130,17 @@ public class TransactionService {
         int totalRowsCreated = savedCommissions.size();
         List<CompleteTransactionResponse.LineCommission> lineResponses = calc.lineResponses();
 
-        trx.setTrxStatus(STATUS_COMPLETED);
+        trx.setTrxStatus(TransactionStatus.COMPLETED.name());
         trx.setCompletedAt(java.time.LocalDateTime.now());
         TrxTransaction savedTrx = trxTransactionRepository.save(trx);
 
         if (isFirstCompletion) {
             log.info("seller activated on first completion sellerId={} trxId={}", seller.getUserId(), trxId);
-            seller.setUserStatus(USER_STATUS_ACTIVE);
+            seller.setUserStatus(UserStatus.ACTIVE.name());
             userRepository.save(seller);
         }
 
-        auditService.saveLog(requesterId, AuditAction.TRANSACTION_COMPLETE, EntityType.TRANSACTION, savedTrx.getTrxId(), "Transaction completed", "SUCCESS", null, null);
+        auditService.saveLog(requesterId, AuditAction.TRANSACTION_COMPLETE, EntityType.TRANSACTION, savedTrx.getTrxId(), "Transaction completed", AuditOutcome.SUCCESS.name(), null, null);
 
         log.info("completeTransaction succeeded trxId={} commissionsCreated={}", savedTrx.getTrxId(), totalRowsCreated);
         return CompleteTransactionResponse.builder()
@@ -160,12 +158,12 @@ public class TransactionService {
 
     @Transactional
     public TransactionStatusUpdateResponse cancelTransaction(UUID requesterId, UUID trxId) {
-        return terminateTransaction(requesterId, trxId, STATUS_CANCELLED, "Transaction cancelled", "transaction cancelled", AuditAction.TRANSACTION_CANCELLED, "SUCCESS");
+        return terminateTransaction(requesterId, trxId, TransactionStatus.CANCELLED.name(), "Transaction cancelled", "transaction cancelled", AuditAction.TRANSACTION_CANCELLED, AuditOutcome.SUCCESS.name());
     }
 
     @Transactional
     public TransactionStatusUpdateResponse failTransaction(UUID requesterId, UUID trxId) {
-        return terminateTransaction(requesterId, trxId, STATUS_FAILED, "Transaction failed", "transaction failed", AuditAction.TRANSACTION_FAILED, "FAILURE");
+        return terminateTransaction(requesterId, trxId, TransactionStatus.FAILED.name(), "Transaction failed", "transaction failed", AuditAction.TRANSACTION_FAILED, AuditOutcome.FAILURE.name());
     }
 
     private TransactionListItemDto buildListItem(
@@ -196,11 +194,11 @@ public class TransactionService {
                 .collect(Collectors.toSet());
 
         BigDecimal agentFeeAmount = commissionService.sumForViewer(
-                commissions, itemIds, CommissionService.COMMISSION_TYPE_AGENT,
+                commissions, itemIds, CommissionType.AGENT_FEE.name(),
                 viewerId, viewerRole);
 
         BigDecimal superAgentFeeAmount = commissionService.sumForViewer(
-                commissions, itemIds, CommissionService.COMMISSION_TYPE_SUPER_AGENT,
+                commissions, itemIds, CommissionType.SUPER_AGENT_FEE.name(),
                 viewerId, viewerRole);
 
         return TransactionListItemDto.builder()
@@ -222,15 +220,15 @@ public class TransactionService {
     public TransactionListResponse listTransactions(
             UUID requesterId, String role, String status, int page, int size) {
 
-        String effectiveRole = (role == null || role.isBlank()) ? ROLE_SELLER : role.toUpperCase();
-        if (!ROLE_SELLER.equals(effectiveRole) && !ROLE_BENEFICIARY.equals(effectiveRole)) {
+        String effectiveRole = (role == null || role.isBlank()) ? ViewerRole.SELLER.name() : role.toUpperCase();
+        if (!ViewerRole.SELLER.name().equals(effectiveRole) && !ViewerRole.BENEFICIARY.name().equals(effectiveRole)) {
             throw new AppException(TransactionErrorCode.TRX_0015);
         }
-        if (size > MAX_PAGE_SIZE) {
+        if (size > PaginationConstants.MAX_PAGE_SIZE) {
             throw new AppException(TransactionErrorCode.TRX_0015);
         }
         if (size <= 0) {
-            size = DEFAULT_PAGE_SIZE;
+            size = PaginationConstants.TRANSACTION_DEFAULT_PAGE_SIZE;
         }
         if (page < 0) {
             page = 0;
@@ -241,7 +239,7 @@ public class TransactionService {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
         Page<TrxTransaction> trxPage;
-        if (ROLE_SELLER.equals(effectiveRole)) {
+        if (ViewerRole.SELLER.name().equals(effectiveRole)) {
             trxPage = (effectiveStatus == null)
                     ? trxTransactionRepository.findByUserId(requesterId, pageable)
                     : trxTransactionRepository.findByUserIdAndTrxStatus(requesterId, effectiveStatus, pageable);
@@ -287,15 +285,15 @@ public class TransactionService {
         BigDecimal totalCommission = totalAgentFee != null ? totalAgentFee : BigDecimal.ZERO;
 
         long completedCount;
-        if (ROLE_SELLER.equals(effectiveRole)) {
-            if (STATUS_COMPLETED.equals(effectiveStatus)) {
+        if (ViewerRole.SELLER.name().equals(effectiveRole)) {
+            if (TransactionStatus.COMPLETED.name().equals(effectiveStatus)) {
                 completedCount = trxPage.getTotalElements();
             } else {
                 completedCount = trxTransactionRepository
-                        .countByUserIdAndTrxStatus(requesterId, STATUS_COMPLETED);
+                        .countByUserIdAndTrxStatus(requesterId, TransactionStatus.COMPLETED.name());
             }
         } else {
-            if (STATUS_COMPLETED.equals(effectiveStatus)) {
+            if (TransactionStatus.COMPLETED.name().equals(effectiveStatus)) {
                 completedCount = trxPage.getTotalElements();
             } else {
                 completedCount = trxTransactionRepository
@@ -318,15 +316,15 @@ public class TransactionService {
     public TransactionListResponseV2 listTransactionsV2(
             UUID requesterId, String role, String status, int page, int size) {
 
-        String effectiveRole = (role == null || role.isBlank()) ? ROLE_SELLER : role.toUpperCase();
-        if (!ROLE_SELLER.equals(effectiveRole) && !ROLE_BENEFICIARY.equals(effectiveRole)) {
+        String effectiveRole = (role == null || role.isBlank()) ? ViewerRole.SELLER.name() : role.toUpperCase();
+        if (!ViewerRole.SELLER.name().equals(effectiveRole) && !ViewerRole.BENEFICIARY.name().equals(effectiveRole)) {
             throw new AppException(TransactionErrorCode.TRX_0015);
         }
-        if (size > MAX_PAGE_SIZE) {
+        if (size > PaginationConstants.MAX_PAGE_SIZE) {
             throw new AppException(TransactionErrorCode.TRX_0015);
         }
         if (size <= 0) {
-            size = DEFAULT_PAGE_SIZE;
+            size = PaginationConstants.TRANSACTION_DEFAULT_PAGE_SIZE;
         }
         if (page < 0) {
             page = 0;
@@ -337,7 +335,7 @@ public class TransactionService {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
         Page<TrxTransaction> trxPage;
-        if (ROLE_SELLER.equals(effectiveRole)) {
+        if (ViewerRole.SELLER.name().equals(effectiveRole)) {
             trxPage = (effectiveStatus == null)
                     ? trxTransactionRepository.findByUserId(requesterId, pageable)
                     : trxTransactionRepository.findByUserIdAndTrxStatus(requesterId, effectiveStatus, pageable);
@@ -383,15 +381,15 @@ public class TransactionService {
         BigDecimal totalCommission = totalAgentFee != null ? totalAgentFee : BigDecimal.ZERO;
 
         long completedCount;
-        if (ROLE_SELLER.equals(effectiveRole)) {
-            if (STATUS_COMPLETED.equals(effectiveStatus)) {
+        if (ViewerRole.SELLER.name().equals(effectiveRole)) {
+            if (TransactionStatus.COMPLETED.name().equals(effectiveStatus)) {
                 completedCount = trxPage.getTotalElements();
             } else {
                 completedCount = trxTransactionRepository
-                        .countByUserIdAndTrxStatus(requesterId, STATUS_COMPLETED);
+                        .countByUserIdAndTrxStatus(requesterId, TransactionStatus.COMPLETED.name());
             }
         } else {
-            if (STATUS_COMPLETED.equals(effectiveStatus)) {
+            if (TransactionStatus.COMPLETED.name().equals(effectiveStatus)) {
                 completedCount = trxPage.getTotalElements();
             } else {
                 completedCount = trxTransactionRepository
@@ -438,11 +436,11 @@ public class TransactionService {
                 .collect(Collectors.toSet());
 
         BigDecimal agentFeeAmount = commissionService.sumForViewer(
-                commissions, itemIds, CommissionService.COMMISSION_TYPE_AGENT,
+                commissions, itemIds, CommissionType.AGENT_FEE.name(),
                 viewerId, viewerRole);
 
         BigDecimal superAgentFeeAmount = commissionService.sumForViewer(
-                commissions, itemIds, CommissionService.COMMISSION_TYPE_SUPER_AGENT,
+                commissions, itemIds, CommissionType.SUPER_AGENT_FEE.name(),
                 viewerId, viewerRole);
 
         int totalQuantity = items.stream()
@@ -454,8 +452,8 @@ public class TransactionService {
                     MstProduct product = productById.get(item.getProductId());
                     BigDecimal itemAgentFee = commissions.stream()
                             .filter(c -> c.getItemId().equals(item.getItemId()))
-                            .filter(c -> CommissionService.COMMISSION_TYPE_AGENT.equals(c.getCommissionType()))
-                            .filter(c -> ROLE_SELLER.equals(viewerRole)
+                            .filter(c -> CommissionType.AGENT_FEE.name().equals(c.getCommissionType()))
+                            .filter(c -> ViewerRole.SELLER.name().equals(viewerRole)
                                     ? viewerId.equals(c.getSourceUserId())
                                     : viewerId.equals(c.getBeneficiaryId()))
                             .map(TrxCommission::getCommissionAmount)
@@ -489,7 +487,7 @@ public class TransactionService {
     }
 
     private boolean isFirstCompletedTransaction(MstUser seller) {
-        return USER_STATUS_PASSIVE.equals(seller.getUserStatus());
+        return UserStatus.PASSIVE.name().equals(seller.getUserStatus());
     }
 
     private static <T> Map<UUID, T> byId(List<T> rows, Function<T, UUID> keyFn) {
@@ -506,7 +504,7 @@ public class TransactionService {
             throw new AppException(TransactionErrorCode.TRX_0012);
         }
 
-        if (!STATUS_PENDING.equals(trx.getTrxStatus())) {
+        if (!TransactionStatus.PENDING.name().equals(trx.getTrxStatus())) {
             throw new AppException(TransactionErrorCode.TRX_0011);
         }
 
@@ -559,7 +557,7 @@ public class TransactionService {
             if (product == null) {
                 throw new AppException(TransactionErrorCode.TRX_0001);
             }
-            if (!"ACTIVE".equals(product.getProductStatus())) {
+            if (!ProductStatus.ACTIVE.name().equals(product.getProductStatus())) {
                 throw new AppException(TransactionErrorCode.TRX_0002);
             }
 
@@ -589,7 +587,7 @@ public class TransactionService {
                 .userId(sellerId)
                 .totalAmount(totalAmount)
                 .totalProfit(totalProfit)
-                .trxStatus("PENDING")
+                .trxStatus(TransactionStatus.PENDING.name())
                 .description(request.getDescription())
                 .build();
         TrxTransaction savedHeader = trxTransactionRepository.save(header);
@@ -602,7 +600,7 @@ public class TransactionService {
         List<TrxItem> savedItems = trxItemRepository.saveAll(itemsToSave);
 
         // === Step 8: build response ===
-        auditService.saveLog(sellerId, AuditAction.TRANSACTION_CREATE, EntityType.TRANSACTION, trxId, "Transaction created with " + savedItems.size() + " items", "SUCCESS", null, null);
+        auditService.saveLog(sellerId, AuditAction.TRANSACTION_CREATE, EntityType.TRANSACTION, trxId, "Transaction created with " + savedItems.size() + " items", AuditOutcome.SUCCESS.name(), null, null);
 
         List<CreateTransactionResponse.TransactionItemResponse> itemResponses =
                 savedItems.stream()
