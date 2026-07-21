@@ -4,6 +4,7 @@ import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.AuthErrorCode;
 import com.indivaragroup.ageninlite.common.enums.AuditAction;
 import com.indivaragroup.ageninlite.common.enums.EntityType;
+import com.indivaragroup.ageninlite.common.utils.PhoneUtils;
 import com.indivaragroup.ageninlite.dto.auth.*;
 import com.indivaragroup.ageninlite.service.audit.AuditService;
 import com.indivaragroup.ageninlite.entity.AuthJwtBlacklist;
@@ -38,11 +39,12 @@ public class AuthService {
 
     @Transactional
     public RegisterResponseDto register(RegisterRequestDto request) {
-        log.info("Process register for phone: {}", request.getPhoneNumber());
+        String normalizedPhone = normalizePhoneOrThrow(request.getPhoneNumber());
+        log.info("Process register for phone: {}", normalizedPhone);
 
         // 1. Cek Ketersediaan Phone & Email
-        if (userRepository.existsByPhoneNumber(request.getPhoneNumber())) {
-            log.error("Register failed: Phone number {} already exists", request.getPhoneNumber());
+        if (userRepository.existsByPhoneNumber(normalizedPhone)) {
+            log.error("Register failed: Phone number {} already exists", normalizedPhone);
             throw new AppException(AuthErrorCode.AUTH_0001);
         }
         if (request.getEmail() != null && !request.getEmail().isEmpty()) {
@@ -82,7 +84,7 @@ public class AuthService {
         
         MstUser newUser = MstUser.builder()
                 .userName(request.getName())
-                .phoneNumber(request.getPhoneNumber())
+                .phoneNumber(normalizedPhone)
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .referralCode(newReferralCode)
@@ -95,7 +97,7 @@ public class AuthService {
         MstUser savedUser = userRepository.save(newUser);
         log.info("User {} successfully registered with ID: {}", savedUser.getPhoneNumber(), savedUser.getUserId());
 
-        auditService.saveLogSync(savedUser.getUserId(), AuditAction.REGISTER, EntityType.USER, savedUser.getUserId(), "Registered via phone: " + request.getPhoneNumber(), "SUCCESS", null, null);
+        auditService.saveLogSync(savedUser.getUserId(), AuditAction.REGISTER, EntityType.USER, savedUser.getUserId(), "Registered via phone: " + normalizedPhone, "SUCCESS", null, null);
 
         return RegisterResponseDto.builder()
                 .userId(savedUser.getUserId())
@@ -111,19 +113,20 @@ public class AuthService {
 
     @Transactional
     public LoginResponseDto login(LoginRequestDto request) {
-        log.info("Process login for phone: {}", request.getPhoneNumber());
+        String normalizedPhone = normalizePhoneOrThrow(request.getPhoneNumber());
+        log.info("Process login for phone: {}", normalizedPhone);
 
         // 1. Cari User
-        MstUser user = userRepository.findByPhoneNumber(request.getPhoneNumber())
+        MstUser user = userRepository.findByPhoneNumber(normalizedPhone)
                 .orElseThrow(() -> {
-                    log.error("Login failed: Phone number {} not found", request.getPhoneNumber());
+                    log.error("Login failed: Phone number {} not found", normalizedPhone);
                     return new AppException(AuthErrorCode.AUTH_0010);
                 });
 
         // 2. Cek Password
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             log.error("Login failed: Incorrect password for user {}", user.getUserId());
-            auditService.saveLog(user.getUserId(), AuditAction.LOGIN_FAILED, EntityType.USER, user.getUserId(), "Incorrect password for phone: " + request.getPhoneNumber(), "FAILURE", null, null);
+            auditService.saveLog(user.getUserId(), AuditAction.LOGIN_FAILED, EntityType.USER, user.getUserId(), "Incorrect password for phone: " + normalizedPhone, "FAILURE", null, null);
             throw new AppException(AuthErrorCode.AUTH_0010);
         }
 
@@ -152,7 +155,7 @@ public class AuthService {
         refreshTokenRepository.save(refreshToken);
         log.info("Login successful for user {}", user.getUserId());
 
-        auditService.saveLog(user.getUserId(), AuditAction.LOGIN, EntityType.USER, user.getUserId(), "Login success for phone: " + request.getPhoneNumber(), "SUCCESS", null, null);
+        auditService.saveLog(user.getUserId(), AuditAction.LOGIN, EntityType.USER, user.getUserId(), "Login success for phone: " + normalizedPhone, "SUCCESS", null, null);
 
         return LoginResponseDto.builder()
                 .accessToken(accessToken)
@@ -336,5 +339,13 @@ public class AuthService {
         }
         log.error("Failed to generate a unique referral code after {} attempts", maxAttempts);
         throw new AppException(AuthErrorCode.AUTH_9999);
+    }
+
+    private String normalizePhoneOrThrow(String rawPhone) {
+        try {
+            return PhoneUtils.normalizeToE164(rawPhone);
+        } catch (IllegalArgumentException ex) {
+            throw new AppException(AuthErrorCode.AUTH_0005);
+        }
     }
 }

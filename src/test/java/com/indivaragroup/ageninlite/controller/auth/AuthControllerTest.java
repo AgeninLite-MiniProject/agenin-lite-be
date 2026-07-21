@@ -83,8 +83,8 @@ class AuthControllerTest {
 
     @Test
     void register_WhenValidationFails_ShouldReturn400() throws Exception {
-        // Name is missing, phone is blank/invalid, etc
-        String jsonRequest = "{\"name\":\"Budi\", \"phone_number\":\"081\", \"email\":\"budi@mail.com\", \"password\":\"password123\"}";
+        // Format validation belongs to PhoneUtils in the service; DTO still rejects oversized input.
+        String jsonRequest = "{\"name\":\"Budi\", \"phone_number\":\"08123456789012345678901234567890\", \"email\":\"budi@mail.com\", \"password\":\"password123\"}";
 
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)

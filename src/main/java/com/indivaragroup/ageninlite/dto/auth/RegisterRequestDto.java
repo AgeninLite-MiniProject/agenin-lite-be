@@ -15,8 +15,7 @@ public class RegisterRequestDto {
     private String name;
 
     @NotBlank(message = "AUTH_0003")
-    @Size(max = 20, message = "AUTH_0003")
-    @Pattern(regexp = "^\\+[1-9]\\d{1,14}$", message = "AUTH_0005")
+    @Size(max = 25, message = "AUTH_0005")
     @JsonProperty("phone_number")
     private String phoneNumber;
 
@@ -25,7 +24,7 @@ public class RegisterRequestDto {
     private String email;
 
     @NotBlank(message = "AUTH_0003")
-    @Size(min = 8, max = 64, message = "AUTH_0002")
+    @Size(min = 8, max = 15, message = "AUTH_0002")
     @Pattern(regexp = "^(?=.*[a-zA-Z])(?=.*\\d).*$", message = "AUTH_0002")
     @JsonProperty("password")
     private String password;

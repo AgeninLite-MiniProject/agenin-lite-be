@@ -1,42 +1,83 @@
 package com.indivaragroup.ageninlite.common.utils;
 
+import java.util.regex.Pattern;
+
 public final class PhoneUtils {
+
+    private static final String COUNTRY_CODE = "62";
+    private static final String E164_PREFIX = "+" + COUNTRY_CODE;
+
+    /**
+     * Nomor seluler Indonesia setelah country code:
+     * - dimulai dengan 8
+     * - total 9 sampai 12 digit
+     *
+     * Contoh: 81234567890
+     */
+    private static final Pattern INDONESIAN_MOBILE_NUMBER = Pattern.compile("^8\\d{8,11}$");
+
+    /**
+     * Prefix pencarian:
+     * - minimal 3 digit
+     * - harus dimulai dengan 8
+     */
+    private static final Pattern INDONESIAN_MOBILE_PREFIX = Pattern.compile("^8\\d{2,11}$");
+
     private PhoneUtils(){
 
     }
 
-    public static String normalizeToE164(String raw) {
-        if (raw == null) {
-            throw new IllegalArgumentException("Phone is required");
+    public static String normalizeToE164(String rawPhone) {
+        String compactPhone = sanitize(rawPhone);
+        String nationalNumber = extractNationalNumber(compactPhone);
+
+        if (!INDONESIAN_MOBILE_NUMBER.matcher(nationalNumber).matches()) {
+            throw new IllegalArgumentException("Indonesian mobile number must start with 8 and contain 9-12 digits");
         }
-        String digits = raw.replaceAll("[\\s\\-\\.\\(\\)]", "");
-        if (!digits.matches("^\\+?\\d{6,15}$")) {
-            throw new IllegalArgumentException("Phone must be 6-15 digits");
-        }
-        return toE164(digits);
+
+        return E164_PREFIX + nationalNumber;
     }
 
-    public static String normalizePrefix(String raw) {
-        if (raw == null) {
-            throw new IllegalArgumentException("Phone prefix is required");
+    public static String normalizePrefix(String rawPrefix) {
+        String compactPrefix = sanitize(rawPrefix);
+        String nationalPrefix = extractNationalNumber(compactPrefix);
+
+        if (!INDONESIAN_MOBILE_PREFIX.matcher(nationalPrefix).matches()) {
+            throw new IllegalArgumentException("Phone prefix must start with 8 and contain at least 3 digits");
         }
-        String digits = raw.replaceAll("[\\s\\-\\.\\(\\)]", "");
-        if (!digits.matches("^\\+?\\d{3,15}$")) {
-            throw new IllegalArgumentException("Phone prefix must be 3-15 digits");
-        }
-        return toE164(digits);
+        return E164_PREFIX + nationalPrefix;
     }
 
-    private static String toE164(String digits) {
-        if (digits.startsWith("+")) {
-            return digits;
+    private static String sanitize(String rawPhone) {
+        if (rawPhone == null || rawPhone.isBlank()) {
+            throw new IllegalArgumentException("Phone number is required");
         }
-        if (digits.startsWith("62")) {
-            return "+" + digits;
+
+        String compactPhone = rawPhone.trim().replaceAll("[\\s\\-().]", "");
+
+        if (!compactPhone.matches("^\\+?\\d+$")) {
+            throw new IllegalArgumentException(
+                    "Phone number contains unsupported characters"
+            );
         }
-        if (digits.startsWith("0")) {
-            return "+62" + digits.substring(1);
+
+        return compactPhone;
+    }
+
+    private static String extractNationalNumber(String compactPhone) {
+        if (compactPhone.startsWith(E164_PREFIX)) {
+            return compactPhone.substring(E164_PREFIX.length());
         }
-        throw new IllegalArgumentException("Phone must start with +, 62, or 0");
+        if (compactPhone.startsWith(COUNTRY_CODE)) {
+            return compactPhone.substring(COUNTRY_CODE.length());
+        }
+        if (compactPhone.startsWith("0")) {
+            return compactPhone.substring(1);
+        }
+        if (compactPhone.startsWith("8")) {
+            return compactPhone;
+        }
+
+        throw new IllegalArgumentException("Phone number must use Indonesian country code");
     }
 }
