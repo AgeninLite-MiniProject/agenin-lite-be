@@ -6,7 +6,6 @@ import com.indivaragroup.ageninlite.common.exception.code.TransactionErrorCode;
 import com.indivaragroup.ageninlite.dto.transaction.CompleteTransactionResponse;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionRequest;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionResponse;
-import com.indivaragroup.ageninlite.dto.transaction.TransactionDetailResponse;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionListResponse;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionListResponseV2;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionStatusUpdateResponse;
@@ -109,16 +108,5 @@ public class TransactionController {
         TransactionListResponseV2 response = transactionService
                 .listTransactionsV2(requesterUuid, role, status, page, size);
         return ResponseEntity.ok(new ApiResponse<>(true, "Transactions fetched", response));
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<TransactionDetailResponse>> getDetail(
-            @AuthenticationPrincipal String requesterId,
-            @PathVariable UUID id) {
-
-        UUID requesterUuid = UUID.fromString(requesterId);
-        TransactionDetailResponse response = transactionService
-                .getTransactionDetail(requesterUuid, id);
-        return ResponseEntity.ok(new ApiResponse<>(true, "Transaction detail fetched", response));
     }
 }

@@ -21,4 +21,5 @@ public class TransactionItemLineDto {
     private Integer quantity;
     private BigDecimal itemAmount;
     private BigDecimal profit;
+    private BigDecimal agentFeeAmount;
 }
