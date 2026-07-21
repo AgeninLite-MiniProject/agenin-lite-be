@@ -2,6 +2,9 @@ package com.indivaragroup.ageninlite.service.commission;
 
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.TransactionErrorCode;
+import com.indivaragroup.ageninlite.common.enums.AuditOutcome;
+import com.indivaragroup.ageninlite.common.enums.CommissionType;
+import com.indivaragroup.ageninlite.common.enums.ViewerRole;
 import com.indivaragroup.ageninlite.dto.transaction.CompleteTransactionResponse.LineCommission;
 import com.indivaragroup.ageninlite.entity.MstProduct;
 import com.indivaragroup.ageninlite.entity.MstUser;
@@ -23,12 +26,6 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class CommissionService {
-
-    public static final String COMMISSION_TYPE_AGENT = "AGENT_FEE";
-    public static final String COMMISSION_TYPE_SUPER_AGENT = "SUPER_AGENT_FEE";
-
-    private static final String ROLE_SELLER = "SELLER";
-    private static final String ROLE_BENEFICIARY = "BENEFICIARY";
 
     private final TrxCommissionRepository trxCommissionRepository;
     private final CommissionCalculator commissionCalculator;
@@ -52,7 +49,7 @@ public class CommissionService {
                     .itemId(item.getItemId())
                     .beneficiaryId(seller.getUserId())
                     .sourceUserId(seller.getUserId())
-                    .commissionType(COMMISSION_TYPE_AGENT)
+                    .commissionType(CommissionType.AGENT_FEE.name())
                     .feePercentage(product.getAgentFee())
                     .commissionAmount(agentFeeAmount)
                     .build());
@@ -65,7 +62,7 @@ public class CommissionService {
                         .itemId(item.getItemId())
                         .beneficiaryId(upline.getUserId())
                         .sourceUserId(seller.getUserId())
-                        .commissionType(COMMISSION_TYPE_SUPER_AGENT)
+                        .commissionType(CommissionType.SUPER_AGENT_FEE.name())
                         .feePercentage(product.getSuperAgentFee())
                         .commissionAmount(superAgentFeeAmount)
                         .build());
@@ -98,7 +95,7 @@ public class CommissionService {
                     EntityType.COMMISSION, 
                     comm.getCommissionId(), 
                     "Commission payout of type " + comm.getCommissionType() + " with amount " + comm.getCommissionAmount(), 
-                    "SUCCESS", 
+                    AuditOutcome.SUCCESS.name(),
                     null, 
                     null
                 );
@@ -120,7 +117,7 @@ public class CommissionService {
         return commissions.stream()
                 .filter(c -> itemIds.contains(c.getItemId()))
                 .filter(c -> commissionType.equals(c.getCommissionType()))
-                .filter(c -> ROLE_SELLER.equals(viewerRole)
+                .filter(c -> ViewerRole.SELLER.name().equals(viewerRole)
                         ? viewerId.equals(c.getSourceUserId())
                         : viewerId.equals(c.getBeneficiaryId()))
                 .map(TrxCommission::getCommissionAmount)
@@ -131,13 +128,13 @@ public class CommissionService {
     public BigDecimal sumAgentFeeFor(UUID beneficiaryId) {
         return trxCommissionRepository
                 .sumCommissionAmountByBeneficiaryIdAndCommissionType(
-                        beneficiaryId, COMMISSION_TYPE_AGENT);
+                        beneficiaryId, CommissionType.AGENT_FEE.name());
     }
 
     public BigDecimal sumSuperAgentFeeFor(UUID beneficiaryId) {
         return trxCommissionRepository
                 .sumCommissionAmountByBeneficiaryIdAndCommissionType(
-                        beneficiaryId, COMMISSION_TYPE_SUPER_AGENT);
+                        beneficiaryId, CommissionType.SUPER_AGENT_FEE.name());
     }
 
     public record CalculationResult(
