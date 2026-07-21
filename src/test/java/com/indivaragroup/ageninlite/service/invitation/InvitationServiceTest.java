@@ -65,7 +65,7 @@ class InvitationServiceTest {
         inviter = MstUser.builder()
                 .userId(inviterId)
                 .userName("Inviter Name")
-                .phoneNumber("+628111")
+                .phoneNumber("+628111111111")
                 .passwordHash("hash")
                 .role("AGENT")
                 .userStatus("ACTIVE")
@@ -75,7 +75,7 @@ class InvitationServiceTest {
         invitee = MstUser.builder()
                 .userId(inviteeId)
                 .userName("Invitee Name")
-                .phoneNumber("+628222")
+                .phoneNumber("+628222222222")
                 .passwordHash("hash")
                 .role("AGENT")
                 .userStatus("PASSIVE")
@@ -83,7 +83,7 @@ class InvitationServiceTest {
                 .referredBy(null)
                 .build();
 
-        request = new SendInvitationRequest("+628222");
+        request = new SendInvitationRequest("+628222222222");
         localFormatRequest = new SendInvitationRequest("0812-345-6789");
 
         otherPendingInvitation = TrxInvitation.builder()
@@ -109,7 +109,7 @@ class InvitationServiceTest {
 
     @Test
     void send_Invitation_WhenNewPair_ShouldPersistPendingInvitation() {
-        when(userRepository.findByPhoneNumber("+628222")).thenReturn(Optional.of(invitee));
+        when(userRepository.findByPhoneNumber("+628222222222")).thenReturn(Optional.of(invitee));
         when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.empty());
         when(invitationRepository.save(any(TrxInvitation.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -126,7 +126,7 @@ class InvitationServiceTest {
 
     @Test
     void send_Invitation_WhenExistingDeclined_ShouldResetTimestampsAndReinvite() {
-        when(userRepository.findByPhoneNumber("+628222")).thenReturn(Optional.of(invitee));
+        when(userRepository.findByPhoneNumber("+628222222222")).thenReturn(Optional.of(invitee));
         when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("DECLINED")));
         when(invitationRepository.save(any(TrxInvitation.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -154,7 +154,7 @@ class InvitationServiceTest {
     @Test
     void send_Invitation_WhenInviteeHasUpline_ShouldThrowInv0004() {
         invitee.setReferredBy(UUID.randomUUID());
-        when(userRepository.findByPhoneNumber("+628222")).thenReturn(Optional.of(invitee));
+        when(userRepository.findByPhoneNumber("+628222222222")).thenReturn(Optional.of(invitee));
 
         AppException ex = assertThrows(AppException.class, () -> invitationService.sendInvitation(inviterId, request));
         assertEquals(InvitationErrorCode.INV_0004, ex.getErrorCode());
@@ -163,7 +163,7 @@ class InvitationServiceTest {
 
     @Test
     void send_Invitation_WhenInviterHas3Pending_ShouldThrowInv0005() {
-        when(userRepository.findByPhoneNumber("+628222")).thenReturn(Optional.of(invitee));
+        when(userRepository.findByPhoneNumber("+628222222222")).thenReturn(Optional.of(invitee));
         when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(3L);
 
         AppException ex = assertThrows(AppException.class, () -> invitationService.sendInvitation(inviterId, request));
@@ -173,7 +173,7 @@ class InvitationServiceTest {
 
     @Test
     void send_Invitation_WhenDuplicatePending_ShouldThrowInv0003() {
-        when(userRepository.findByPhoneNumber("+628222")).thenReturn(Optional.of(invitee));
+        when(userRepository.findByPhoneNumber("+628222222222")).thenReturn(Optional.of(invitee));
         when(invitationRepository.countByInviterIdAndInvitationStatus(inviterId, "PENDING")).thenReturn(0L);
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
 
@@ -184,7 +184,7 @@ class InvitationServiceTest {
 
     @Test
     void send_Invitation_WhenPhoneNotRegistered_ShouldThrowInv0023() {
-        when(userRepository.findByPhoneNumber("+628222")).thenReturn(Optional.empty());
+        when(userRepository.findByPhoneNumber("+628222222222")).thenReturn(Optional.empty());
 
         AppException ex = assertThrows(AppException.class, () -> invitationService.sendInvitation(inviterId, request));
         assertEquals(InvitationErrorCode.INV_0023, ex.getErrorCode());
@@ -194,7 +194,7 @@ class InvitationServiceTest {
     @Test
     void send_Invitation_WhenInviteeDeleted_ShouldThrowInv0007() {
         invitee.setDeleted(true);
-        when(userRepository.findByPhoneNumber("+628222")).thenReturn(Optional.of(invitee));
+        when(userRepository.findByPhoneNumber("+628222222222")).thenReturn(Optional.of(invitee));
 
         AppException ex = assertThrows(AppException.class, () -> invitationService.sendInvitation(inviterId, request));
         assertEquals(InvitationErrorCode.INV_0007, ex.getErrorCode());
@@ -526,7 +526,7 @@ class InvitationServiceTest {
 
         assertEquals(1, result.getInvitations().size());
         assertEquals("Invitee Name", result.getInvitations().get(0).getInviteeName());
-        assertEquals("+628222", result.getInvitations().get(0).getInviteePhone());
+        assertEquals("+628222222222", result.getInvitations().get(0).getInviteePhone());
         assertEquals(0L, result.getPendingCount());
         assertEquals(3, result.getPendingCap());
     }
@@ -621,7 +621,7 @@ class InvitationServiceTest {
 
         assertEquals(1, result.getInvitations().size());
         assertEquals("Inviter Name", result.getInvitations().get(0).getInviterName());
-        assertEquals("+628111", result.getInvitations().get(0).getInviterPhone());
+        assertEquals("+628111111111", result.getInvitations().get(0).getInviterPhone());
         assertEquals(0L, result.getPendingCount());
     }
 
