@@ -431,52 +431,6 @@ class TransactionControllerTest {
         verify(transactionService, never()).listTransactions(any(), any(), any(), anyInt(), anyInt());
     }
 
-    // ==================== Group 6: getDetail (GET /api/transactions/{id}) ====================
-
-    @Test
-    void getDetail_WithValidPath_ShouldReturn200WithBody() throws Exception {
-        var response = com.indivaragroup.ageninlite.dto.transaction.TransactionDetailResponse.builder()
-                .id(trxId)
-                .productId(productId)
-                .productName("Pulsa 50k")
-                .quantity(1)
-                .amount(new BigDecimal("50000.00"))
-                .profit(new BigDecimal("5000.00"))
-                .agentFeeAmount(new BigDecimal("500.00"))
-                .superAgentFeeAmount(new BigDecimal("250.00"))
-                .status("COMPLETED")
-                .sellerId(sellerId)
-                .sellerName("Seller")
-                .items(List.of())
-                .build();
-        when(transactionService.getTransactionDetail(any(), any())).thenReturn(response);
-
-        mockMvc.perform(get("/api/transactions/{id}", trxId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Transaction detail fetched"))
-                .andExpect(jsonPath("$.data.id").value(trxId.toString()))
-                .andExpect(jsonPath("$.data.sellerId").value(sellerId.toString()))
-                .andExpect(jsonPath("$.data.status").value("COMPLETED"));
-    }
-
-    @Test
-    void getDetail_WhenServiceThrowsTrx0010_ShouldReturn404() throws Exception {
-        when(transactionService.getTransactionDetail(any(), any()))
-                .thenThrow(new AppException(TransactionErrorCode.TRX_0010));
-
-        mockMvc.perform(get("/api/transactions/{id}", trxId))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message").value("TRX_0010: Transaction not found"));
-    }
-
-    @Test
-    void getDetail_WithMalformedPathUuid_ShouldReturn400() throws Exception {
-        mockMvc.perform(get("/api/transactions/not-a-uuid"))
-                .andExpect(status().isBadRequest());
-        verify(transactionService, never()).getTransactionDetail(any(), any());
-    }
-
     // ==================== Group 7: listV2 (GET /api/transactions?v=2) ====================
 
     @Test

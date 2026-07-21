@@ -5,7 +5,6 @@ import com.indivaragroup.ageninlite.common.exception.code.TransactionErrorCode;
 import com.indivaragroup.ageninlite.dto.transaction.CompleteTransactionResponse;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionRequest;
 import com.indivaragroup.ageninlite.dto.transaction.CreateTransactionResponse;
-import com.indivaragroup.ageninlite.dto.transaction.TransactionDetailResponse;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionItemLineDto;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionListItemDto;
 import com.indivaragroup.ageninlite.dto.transaction.TransactionListItemV2Dto;
@@ -453,6 +452,16 @@ public class TransactionService {
         List<TransactionItemLineDto> lines = items.stream()
                 .map(item -> {
                     MstProduct product = productById.get(item.getProductId());
+                    BigDecimal itemAgentFee = commissions.stream()
+                            .filter(c -> c.getItemId().equals(item.getItemId()))
+                            .filter(c -> CommissionService.COMMISSION_TYPE_AGENT.equals(c.getCommissionType()))
+                            .filter(c -> ROLE_SELLER.equals(viewerRole)
+                                    ? viewerId.equals(c.getSourceUserId())
+                                    : viewerId.equals(c.getBeneficiaryId()))
+                            .map(TrxCommission::getCommissionAmount)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
                     return TransactionItemLineDto.builder()
                             .itemId(item.getItemId())
                             .productId(item.getProductId())
@@ -460,6 +469,7 @@ public class TransactionService {
                             .quantity(item.getQuantity())
                             .itemAmount(item.getItemAmount())
                             .profit(item.getProfit())
+                            .agentFeeAmount(itemAgentFee)
                             .build();
                 })
                 .toList();
@@ -475,76 +485,6 @@ public class TransactionService {
                 .superAgentFeeAmount(superAgentFeeAmount)
                 .totalQuantity(totalQuantity)
                 .items(lines)
-                .build();
-    }
-
-    @Transactional(readOnly = true)
-    public TransactionDetailResponse getTransactionDetail(UUID requesterId, UUID trxId) {
-        TrxTransaction trx = trxTransactionRepository.findById(trxId)
-                .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
-
-        boolean isSeller = trx.getUserId().equals(requesterId);
-        boolean isBeneficiary = !isSeller && trxCommissionRepository
-                .existsByBeneficiaryIdAndSourceUserId(requesterId, trx.getUserId());
-        if (!isSeller && !isBeneficiary) {
-            throw new AppException(TransactionErrorCode.TRX_0014);
-        }
-
-        List<TrxItem> items = trxItemRepository.findByTrxId(trxId);
-
-        Map<UUID, MstProduct> productById;
-        if (items.isEmpty()) {
-            productById = Map.of();
-        } else {
-            List<UUID> productIds = items.stream()
-                    .map(TrxItem::getProductId)
-                    .distinct()
-                    .toList();
-            productById = byId(productRepository.findAllById(productIds), MstProduct::getProductId);
-        }
-
-        List<UUID> itemIds = items.stream().map(TrxItem::getItemId).toList();
-        List<TrxCommission> commissions = itemIds.isEmpty()
-                ? List.of()
-                : trxCommissionRepository.findAllByItemIdIn(itemIds);
-
-        TransactionListItemDto base = buildListItem(
-                trx, requesterId, isSeller ? ROLE_SELLER : ROLE_BENEFICIARY,
-                items, productById, commissions);
-
-        MstUser seller = userRepository.findById(trx.getUserId())
-                .orElseThrow(() -> new AppException(TransactionErrorCode.TRX_0010));
-
-        List<CreateTransactionResponse.TransactionItemResponse> itemResponses = items.stream()
-                .map(item -> {
-                    MstProduct product = productById.get(item.getProductId());
-                    return CreateTransactionResponse.TransactionItemResponse.builder()
-                            .itemId(item.getItemId())
-                            .productId(item.getProductId())
-                            .productName(product != null ? product.getProductName() : null)
-                            .quantity(item.getQuantity())
-                            .itemAmount(item.getItemAmount())
-                            .profit(item.getProfit())
-                            .build();
-                })
-                .toList();
-
-        return TransactionDetailResponse.builder()
-                .id(base.getId())
-                .productId(base.getProductId())
-                .productName(base.getProductName())
-                .quantity(base.getQuantity())
-                .amount(base.getAmount())
-                .profit(base.getProfit())
-                .agentFeeAmount(base.getAgentFeeAmount())
-                .superAgentFeeAmount(base.getSuperAgentFeeAmount())
-                .status(base.getStatus())
-                .createdAt(base.getCreatedAt())
-                .completedAt(base.getCompletedAt())
-                .description(trx.getDescription())
-                .sellerId(trx.getUserId())
-                .sellerName(seller.getUserName())
-                .items(itemResponses)
                 .build();
     }
 
