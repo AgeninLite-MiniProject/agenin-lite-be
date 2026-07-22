@@ -38,6 +38,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
+    private static final String VALID_PHONE = "+6281234567890";
+
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -64,12 +66,12 @@ class AuthServiceTest {
     void setUp() {
         registerRequest = new RegisterRequestDto();
         registerRequest.setName("Budi");
-        registerRequest.setPhoneNumber("+628123");
+        registerRequest.setPhoneNumber(VALID_PHONE);
         registerRequest.setPassword("password123");
         registerRequest.setEmail("budi@mail.com");
 
         loginRequest = new LoginRequestDto();
-        loginRequest.setPhoneNumber("+628123");
+        loginRequest.setPhoneNumber(VALID_PHONE);
         loginRequest.setPassword("password123");
 
         refreshRequest = new RefreshRequestDto();
@@ -82,7 +84,7 @@ class AuthServiceTest {
 
         existingUser = new MstUser();
         existingUser.setUserId(UUID.randomUUID());
-        existingUser.setPhoneNumber("+628123");
+        existingUser.setPhoneNumber(VALID_PHONE);
         existingUser.setPasswordHash("hashedPassword");
         existingUser.setRole("AGENT");
         existingUser.setDeleted(false);
@@ -102,6 +104,42 @@ class AuthServiceTest {
         assertNotNull(response);
         assertEquals("Budi", response.getName());
         verify(userRepository).save(any(MstUser.class));
+    }
+
+    @Test
+    void register_LocalPhone_NormalizesBeforeDuplicateCheckAndSave() {
+        registerRequest.setPhoneNumber("081234567890");
+        when(userRepository.existsByPhoneNumber(VALID_PHONE)).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(userRepository.save(any(MstUser.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        RegisterResponseDto response = authService.register(registerRequest);
+
+        assertEquals(VALID_PHONE, response.getPhoneNumber());
+        verify(userRepository).existsByPhoneNumber(VALID_PHONE);
+        verify(userRepository).save(argThat(user -> VALID_PHONE.equals(user.getPhoneNumber())));
+    }
+
+    @Test
+    void register_LocalPhoneMatchingExistingCanonicalPhone_ThrowsDuplicate() {
+        registerRequest.setPhoneNumber("081234567890");
+        when(userRepository.existsByPhoneNumber(VALID_PHONE)).thenReturn(true);
+
+        AppException ex = assertThrows(AppException.class, () -> authService.register(registerRequest));
+
+        assertEquals(AuthErrorCode.AUTH_0001, ex.getErrorCode());
+        verify(userRepository).existsByPhoneNumber(VALID_PHONE);
+        verify(userRepository, never()).save(any(MstUser.class));
+    }
+
+    @Test
+    void register_InvalidPhone_ThrowsAuth0005WithoutRepositoryCall() {
+        registerRequest.setPhoneNumber("0812abc");
+
+        AppException ex = assertThrows(AppException.class, () -> authService.register(registerRequest));
+
+        assertEquals(AuthErrorCode.AUTH_0005, ex.getErrorCode());
+        verifyNoInteractions(userRepository);
     }
 
     @Test
@@ -226,6 +264,31 @@ class AuthServiceTest {
         assertEquals(900, response.getExpiresIn());
         assertEquals("AGENT", response.getRole());
         verify(refreshTokenRepository).save(any(AuthRefreshToken.class));
+    }
+
+    @Test
+    void login_NationalPhone_NormalizesBeforeLookup() {
+        loginRequest.setPhoneNumber("81234567890");
+        when(userRepository.findByPhoneNumber(VALID_PHONE)).thenReturn(Optional.of(existingUser));
+        when(passwordEncoder.matches("password123", "hashedPassword")).thenReturn(true);
+        when(jwtUtil.generateToken(any(), any(), any())).thenReturn("access_jwt");
+        when(jwtUtil.generateRefreshToken(any(), any())).thenReturn("refresh_jwt");
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed_refresh");
+
+        LoginResponseDto response = authService.login(loginRequest);
+
+        assertEquals("access_jwt", response.getAccessToken());
+        verify(userRepository).findByPhoneNumber(VALID_PHONE);
+    }
+
+    @Test
+    void login_InvalidPhone_ThrowsAuth0005WithoutRepositoryCall() {
+        loginRequest.setPhoneNumber("0812abc");
+
+        AppException ex = assertThrows(AppException.class, () -> authService.login(loginRequest));
+
+        assertEquals(AuthErrorCode.AUTH_0005, ex.getErrorCode());
+        verifyNoInteractions(userRepository);
     }
 
     @Test

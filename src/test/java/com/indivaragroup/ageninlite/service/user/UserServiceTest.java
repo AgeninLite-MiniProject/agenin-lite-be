@@ -101,12 +101,13 @@ class UserServiceTest {
     @Test
     void searchByPhonePrefix_noMatches_returnsEmptyList() {
         Page<MstUser> emptyPage = new PageImpl<>(List.of(), PageRequest.of(0, 50), 0);
-        when(userRepository.searchAgentsByPhonePrefix(eq("+62999"), any(Pageable.class)))
+        when(userRepository.searchAgentsByPhonePrefix(eq("+62899"), any(Pageable.class)))
                 .thenReturn(emptyPage);
 
-        List<UserSearchItemDto> result = userService.searchByPhonePrefix("0999");
+        List<UserSearchItemDto> result = userService.searchByPhonePrefix("0899");
 
         assertThat(result).isEmpty();
+        verify(userRepository).searchAgentsByPhonePrefix(eq("+62899"), any(Pageable.class));
     }
 
     @Test

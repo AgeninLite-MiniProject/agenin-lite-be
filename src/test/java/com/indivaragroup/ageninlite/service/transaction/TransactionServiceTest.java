@@ -97,7 +97,7 @@ class TransactionServiceTest {
         seller = MstUser.builder()
                 .userId(sellerId)
                 .userName("Seller")
-                .phoneNumber("+628111")
+                .phoneNumber("+628111111111")
                 .passwordHash("h")
                 .role("AGENT")
                 .userStatus("ACTIVE")
@@ -108,7 +108,7 @@ class TransactionServiceTest {
         passiveSeller = MstUser.builder()
                 .userId(sellerId)
                 .userName("Seller")
-                .phoneNumber("+628111")
+                .phoneNumber("+628111111111")
                 .passwordHash("h")
                 .role("AGENT")
                 .userStatus("PASSIVE")
@@ -119,7 +119,7 @@ class TransactionServiceTest {
         upline = MstUser.builder()
                 .userId(uplineId)
                 .userName("Upline")
-                .phoneNumber("+628222")
+                .phoneNumber("+628222222222")
                 .passwordHash("h")
                 .role("AGENT")
                 .userStatus("ACTIVE")
@@ -986,128 +986,6 @@ class TransactionServiceTest {
         assertNotEquals(result.getTotalCommission(), result.getTransactions().get(0).getAgentFeeAmount());
     }
 
-    // ==================== Group 6: getTransactionDetail() ====================
-
-    @Test
-    void getDetail_WhenRequesterIsSeller_ShouldReturnDetail() {
-        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
-        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
-        when(productRepository.findAllById(any())).thenReturn(List.of(product));
-        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
-        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
-
-        var result = transactionService.getTransactionDetail(sellerId, trxId);
-
-        assertNotNull(result);
-        assertEquals(trxId, result.getId());
-        assertEquals(sellerId, result.getSellerId());
-        assertEquals("Seller", result.getSellerName());
-        assertEquals(1, result.getItems().size());
-        assertEquals("Pulsa 50k", result.getProductName());
-    }
-
-    @Test
-    void getDetail_WhenRequesterIsBeneficiary_ShouldReturnDetail() {
-        UUID beneficiaryId = UUID.randomUUID();
-        trx.setUserId(sellerId);
-        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
-        when(trxCommissionRepository.existsByBeneficiaryIdAndSourceUserId(eq(beneficiaryId), eq(sellerId))).thenReturn(true);
-        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
-        when(productRepository.findAllById(any())).thenReturn(List.of(product));
-        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
-        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
-
-        var result = transactionService.getTransactionDetail(beneficiaryId, trxId);
-
-        assertNotNull(result);
-        assertEquals(sellerId, result.getSellerId());
-        assertEquals("Seller", result.getSellerName());
-        assertEquals(0, BigDecimal.ZERO.compareTo(result.getAgentFeeAmount()));
-        assertEquals(0, BigDecimal.ZERO.compareTo(result.getSuperAgentFeeAmount()));
-    }
-
-    @Test
-    void getDetail_WhenTrxNotFound_ShouldThrowTrx0010() {
-        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.empty());
-
-        AppException ex = assertThrows(AppException.class,
-                () -> transactionService.getTransactionDetail(sellerId, trxId));
-        assertEquals(TransactionErrorCode.TRX_0010, ex.getErrorCode());
-    }
-
-    @Test
-    void getDetail_WhenRequesterIsNeitherSellerNorBeneficiary_ShouldThrowTrx0014() {
-        UUID randomUserId = UUID.randomUUID();
-        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
-        when(trxCommissionRepository.existsByBeneficiaryIdAndSourceUserId(eq(randomUserId), eq(sellerId))).thenReturn(false);
-
-        AppException ex = assertThrows(AppException.class,
-                () -> transactionService.getTransactionDetail(randomUserId, trxId));
-        assertEquals(TransactionErrorCode.TRX_0014, ex.getErrorCode());
-        verify(trxItemRepository, never()).findByTrxId(any());
-    }
-
-    @Test
-    void getDetail_WhenItemsEmpty_ShouldStillReturnWithZeroFees() {
-        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
-        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of());
-        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
-
-        var result = transactionService.getTransactionDetail(sellerId, trxId);
-
-        assertNotNull(result);
-        assertEquals(0, result.getItems().size());
-        assertEquals(0, BigDecimal.ZERO.compareTo(result.getAgentFeeAmount()));
-        assertEquals(0, BigDecimal.ZERO.compareTo(result.getSuperAgentFeeAmount()));
-        verify(productRepository, never()).findAllById(any());
-    }
-
-    @Test
-    void getDetail_WhenSellerUserNotFound_ShouldThrowTrx0010() {
-        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
-        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
-        when(productRepository.findAllById(any())).thenReturn(List.of(product));
-        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
-        when(userRepository.findById(sellerId)).thenReturn(Optional.empty());
-
-        AppException ex = assertThrows(AppException.class,
-                () -> transactionService.getTransactionDetail(sellerId, trxId));
-        assertEquals(TransactionErrorCode.TRX_0010, ex.getErrorCode());
-    }
-
-    @Test
-    void getDetail_WhenBeneficiaryHasCommissions_ShouldPopulateAgentAndSuperAgentFees() {
-        UUID beneficiaryId = UUID.randomUUID();
-        TrxCommission agentCommission = TrxCommission.builder()
-                .itemId(item.getItemId())
-                .beneficiaryId(beneficiaryId)
-                .sourceUserId(sellerId)
-                .commissionType("AGENT_FEE")
-                .feePercentage(new BigDecimal("10.00"))
-                .commissionAmount(new BigDecimal("500.00"))
-                .build();
-        TrxCommission superAgentCommission = TrxCommission.builder()
-                .itemId(item.getItemId())
-                .beneficiaryId(beneficiaryId)
-                .sourceUserId(sellerId)
-                .commissionType("SUPER_AGENT_FEE")
-                .feePercentage(new BigDecimal("5.00"))
-                .commissionAmount(new BigDecimal("250.00"))
-                .build();
-
-        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
-        when(trxCommissionRepository.existsByBeneficiaryIdAndSourceUserId(eq(beneficiaryId), eq(sellerId))).thenReturn(true);
-        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
-        when(productRepository.findAllById(any())).thenReturn(List.of(product));
-        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(agentCommission, superAgentCommission));
-        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
-
-        var result = transactionService.getTransactionDetail(beneficiaryId, trxId);
-
-        assertEquals(0, new BigDecimal("500.00").compareTo(result.getAgentFeeAmount()));
-        assertEquals(0, new BigDecimal("250.00").compareTo(result.getSuperAgentFeeAmount()));
-    }
-
     // ==================== Group 7: Additional branch coverage ====================
 
     @Test
@@ -1145,18 +1023,22 @@ class TransactionServiceTest {
     }
 
     @Test
-    void getDetail_WhenProductMissingInBatch_ShouldReturnNullProductName() {
-        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
-        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
-        when(productRepository.findAllById(any())).thenReturn(List.of());
+    void list_WhenProductMissingFromBatch_ShouldReturnNullProductName() {
+        // Covers the firstProduct == null branch in buildListItem (V1).
+        // Previously covered by getDetail_WhenProductMissingInBatch, which was
+        // deleted along with the detail endpoint. This test restores branch coverage.
+        Page<TrxTransaction> page = new PageImpl<>(List.of(trx), PageRequest.of(0, 10), 1);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(item));
+        when(productRepository.findAllById(any())).thenReturn(List.of()); // product not found
         when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of());
-        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
 
-        var result = transactionService.getTransactionDetail(sellerId, trxId);
+        var result = transactionService.listTransactions(sellerId, "SELLER", null, 0, 10);
 
-        assertNotNull(result);
-        assertNull(result.getProductName());
-        assertNull(result.getItems().get(0).getProductName());
+        assertEquals(1, result.getTransactions().size());
+        assertNull(result.getTransactions().get(0).getProductName());
     }
 
     @Test
@@ -1530,6 +1412,53 @@ class TransactionServiceTest {
     }
 
     @Test
+    void listV2_WhenSellerRoleWithAgentFeeCommissions_ShouldPopulatePerItemAgentFeeAmount() {
+        // Verify that each item line in the V2 response carries its own agentFeeAmount
+        // (the actual AGENT_FEE commission), not the gross margin (item.getProfit()).
+        UUID itemAId = UUID.randomUUID();
+        UUID itemBId = UUID.randomUUID();
+        TrxItem itemA = TrxItem.builder().itemId(itemAId).trxId(trxId).productId(productId)
+                .quantity(1).itemAmount(new BigDecimal("50000.00")).profit(new BigDecimal("5000.00")).build();
+        TrxItem itemB = TrxItem.builder().itemId(itemBId).trxId(trxId).productId(productId)
+                .quantity(2).itemAmount(new BigDecimal("100000.00")).profit(new BigDecimal("10000.00")).build();
+
+        // AGENT_FEE commissions: 10% of profit → 500 for itemA, 1000 for itemB
+        TrxCommission commA = TrxCommission.builder()
+                .itemId(itemAId).beneficiaryId(sellerId).sourceUserId(sellerId)
+                .commissionType("AGENT_FEE").feePercentage(new BigDecimal("10.00"))
+                .commissionAmount(new BigDecimal("500.00")).build();
+        TrxCommission commB = TrxCommission.builder()
+                .itemId(itemBId).beneficiaryId(sellerId).sourceUserId(sellerId)
+                .commissionType("AGENT_FEE").feePercentage(new BigDecimal("10.00"))
+                .commissionAmount(new BigDecimal("1000.00")).build();
+
+        Page<TrxTransaction> page = new PageImpl<>(List.of(trx), PageRequest.of(0, 10), 1);
+        when(trxTransactionRepository.findByUserId(eq(sellerId), any())).thenReturn(page);
+        when(trxItemRepository.findByTrxIdIn(any())).thenReturn(List.of(itemA, itemB));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product));
+        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(commA, commB));
+        when(commissionService.sumAgentFeeFor(eq(sellerId))).thenReturn(BigDecimal.ZERO);
+        when(trxTransactionRepository.countByUserIdAndTrxStatus(eq(sellerId), eq("COMPLETED"))).thenReturn(0L);
+
+        var result = transactionService.listTransactionsV2(sellerId, "SELLER", null, 0, 10);
+
+        assertEquals(1, result.getTransactions().size());
+        assertEquals(2, result.getTransactions().get(0).getItems().size());
+
+        // Item A: commission should be 500.00 (the AGENT_FEE), NOT 5000.00 (the profit)
+        assertEquals(0, new BigDecimal("500.00").compareTo(
+                result.getTransactions().get(0).getItems().get(0).getAgentFeeAmount()));
+        assertNotEquals(0, new BigDecimal("5000.00").compareTo(
+                result.getTransactions().get(0).getItems().get(0).getAgentFeeAmount()));
+
+        // Item B: commission should be 1000.00 (the AGENT_FEE), NOT 10000.00 (the profit)
+        assertEquals(0, new BigDecimal("1000.00").compareTo(
+                result.getTransactions().get(0).getItems().get(1).getAgentFeeAmount()));
+        assertNotEquals(0, new BigDecimal("10000.00").compareTo(
+                result.getTransactions().get(0).getItems().get(1).getAgentFeeAmount()));
+    }
+
+    @Test
     void listV2_WhenSellerRole_ShouldMatchSuperAgentFeeBySourceUserId() {
         // Covers line 516-517 true branch: role=SELLER → match c.getSourceUserId() for SUPER_AGENT_FEE
         UUID otherSellerId = UUID.randomUUID();
@@ -1738,53 +1667,6 @@ class TransactionServiceTest {
         assertNotNull(result);
         verify(trxTransactionRepository).findByUserId(eq(sellerId), any());
         verify(trxTransactionRepository, never()).findByUserIdAndTrxStatus(any(), any(), any());
-    }
-
-    @Test
-    void getDetail_WhenRequesterIsBeneficiaryAndItemsEmpty_ShouldReturnZeroFees() {
-        // S7: beneficiary branch + empty items
-        UUID beneficiaryId = UUID.randomUUID();
-        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
-        when(trxCommissionRepository.existsByBeneficiaryIdAndSourceUserId(eq(beneficiaryId), eq(sellerId))).thenReturn(true);
-        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of());
-        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
-
-        var result = transactionService.getTransactionDetail(beneficiaryId, trxId);
-
-        assertNotNull(result);
-        assertEquals(0, result.getItems().size());
-        assertEquals(0, BigDecimal.ZERO.compareTo(result.getAgentFeeAmount()));
-        assertEquals(0, BigDecimal.ZERO.compareTo(result.getSuperAgentFeeAmount()));
-        assertEquals(sellerId, result.getSellerId());
-    }
-
-    @Test
-    void getDetail_WhenBeneficiaryHasCommissions_ShouldPopulateItemsListShape() {
-        // S10: also assert items list shape (productName, quantity) when beneficiary path active
-        UUID beneficiaryId = UUID.randomUUID();
-        TrxCommission agentCommission = TrxCommission.builder()
-                .itemId(item.getItemId())
-                .beneficiaryId(beneficiaryId)
-                .sourceUserId(sellerId)
-                .commissionType("AGENT_FEE")
-                .feePercentage(new BigDecimal("10.00"))
-                .commissionAmount(new BigDecimal("500.00"))
-                .build();
-        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
-        when(trxCommissionRepository.existsByBeneficiaryIdAndSourceUserId(eq(beneficiaryId), eq(sellerId))).thenReturn(true);
-        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
-        when(productRepository.findAllById(any())).thenReturn(List.of(product));
-        when(trxCommissionRepository.findAllByItemIdIn(any())).thenReturn(List.of(agentCommission));
-        when(userRepository.findById(sellerId)).thenReturn(Optional.of(seller));
-
-        var result = transactionService.getTransactionDetail(beneficiaryId, trxId);
-
-        assertEquals(1, result.getItems().size());
-        assertEquals("Pulsa 50k", result.getItems().get(0).getProductName());
-        assertEquals(1, result.getItems().get(0).getQuantity());
-        // item's stored amount/profit come from the TrxItem fixture (50000.00 / 5000.00), not the commission amount
-        assertEquals(0, new BigDecimal("50000.00").compareTo(result.getItems().get(0).getItemAmount()));
-        assertEquals(0, new BigDecimal("5000.00").compareTo(result.getItems().get(0).getProfit()));
     }
 
     @Test
