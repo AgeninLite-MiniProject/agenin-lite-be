@@ -1,0 +1,35 @@
+steps:
+  - id: Build image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - asia-southeast2-docker.pkg.dev/$PROJECT_ID/agenin-lite/agenin-lite-be:$COMMIT_SHA
+      - .
+
+  - id: Push image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - asia-southeast2-docker.pkg.dev/$PROJECT_ID/agenin-lite/agenin-lite-be:$COMMIT_SHA
+
+  - id: Deploy Cloud Run
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - agenin-lite-api
+      - --image
+      - asia-southeast2-docker.pkg.dev/$PROJECT_ID/agenin-lite/agenin-lite-be:$COMMIT_SHA
+      - --region
+      - asia-southeast2
+      - --platform
+      - managed
+      - --quiet
+
+images:
+  - asia-southeast2-docker.pkg.dev/$PROJECT_ID/agenin-lite/agenin-lite-be:$COMMIT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
