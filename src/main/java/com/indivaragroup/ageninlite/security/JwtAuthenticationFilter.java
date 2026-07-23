@@ -1,6 +1,8 @@
 package com.indivaragroup.ageninlite.security;
 
+import com.indivaragroup.ageninlite.entity.MstUser;
 import com.indivaragroup.ageninlite.repository.auth.JwtBlacklistRepository;
+import com.indivaragroup.ageninlite.repository.auth.UserRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -17,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -25,6 +28,7 @@ import java.util.UUID;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final JwtBlacklistRepository jwtBlacklistRepository;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -80,12 +84,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
 
-                String userId = claims.getSubject();
+                String userIdStr = claims.getSubject();
+                UUID userId;
+                try {
+                    userId = UUID.fromString(userIdStr);
+                } catch (IllegalArgumentException e) {
+                    log.error("Filter blocked: Invalid user ID format");
+                    sendAuthError(response, HttpServletResponse.SC_UNAUTHORIZED, "AUTH_0020", "Invalid user ID format");
+                    return;
+                }
+
+                Optional<MstUser> userOpt = userRepository.findById(userId);
+                if (userOpt.isEmpty() || userOpt.get().isDeleted()) {
+                    log.error("Filter blocked: User account is banned or deleted ({})", userId);
+                    sendAuthError(response, HttpServletResponse.SC_FORBIDDEN, "AUTH_0011", "Akun ini telah di-ban oleh Admin.");
+                    return;
+                }
+
                 String role = claims.get("role", String.class);
 
                 SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + role.toUpperCase());
 
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(userId, null, Collections.singleton(authority));
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(userIdStr, null, Collections.singleton(authority));
 
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
