@@ -118,6 +118,15 @@ public class InvitationService {
         if (inviterDownlinerCount >= MAX_DOWNLINERS_PER_USER) {
             invitation.setInvitationStatus(InvitationStatus.EXPIRED.name());
             invitationRepository.save(invitation);
+            auditService.saveLog(
+                    inviteeId,
+                    AuditAction.INVITATION_EXPIRED,
+                    EntityType.INVITATION,
+                    invitation.getInvitationId(),
+                    "Invitation auto-expired (inviter " + inviterId + " at downliner cap",
+                    AuditOutcome.SUCCESS.name(),
+                    null, null
+            );
             throw new AppException(InvitationErrorCode.INV_0010);
         }
 
@@ -136,6 +145,15 @@ public class InvitationService {
             log.info("competing invitation auto-expired inviteeId={} expiredInviterId={} acceptedInviterId={}", inviteeId, other.getInviterId(), inviterId);
             other.setInvitationStatus(InvitationStatus.EXPIRED.name());
             invitationRepository.save(other);
+            auditService.saveLog(
+                    inviteeId,
+                    AuditAction.INVITATION_EXPIRED,
+                    EntityType.INVITATION,
+                    other.getInvitationId(),
+                    "Invitation auto-expired (competing acceptance by inviter " + inviterId + ")",
+                    AuditOutcome.SUCCESS.name(),
+                    null, null
+            );
         }
 
         log.info("invitation accepted inviterId={} inviteeId={} downlinerCount={}", inviterId, inviteeId, userRepository.countByReferredBy(inviterId));

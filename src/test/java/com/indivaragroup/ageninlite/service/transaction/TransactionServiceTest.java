@@ -1,5 +1,8 @@
 package com.indivaragroup.ageninlite.service.transaction;
 
+import com.indivaragroup.ageninlite.common.enums.AuditAction;
+import com.indivaragroup.ageninlite.common.enums.AuditOutcome;
+import com.indivaragroup.ageninlite.common.enums.EntityType;
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.TransactionErrorCode;
 import com.indivaragroup.ageninlite.dto.transaction.CompleteTransactionResponse;
@@ -221,6 +224,59 @@ class TransactionServiceTest {
         assertEquals(2, result.getCommissionsCreated());
         assertEquals("Upline", result.getSuperAgentName());
         verify(userRepository, never()).save(any(MstUser.class));
+        verify(auditService, never()).saveLog(
+                any(), eq(AuditAction.USER_ACTIVATED), any(), any(), any(), any(), any(), any()
+        );
+    }
+
+    @Test
+    void completeTransaction_WhenPassiveSellerFirstCompletion_ShouldActivateAndAuditUserActivated() {
+        // Arrange — use the passiveSeller fixture (line 108) to force the first-completion path
+        when(trxTransactionRepository.findById(trxId)).thenReturn(Optional.of(trx));
+        when(trxItemRepository.findByTrxId(trxId)).thenReturn(List.of(item));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product));
+        when(userRepository.findById(sellerId)).thenReturn(Optional.of(passiveSeller));
+        // passiveSeller has no referred_by, so no upline lookup
+        when(commissionService.calculate(any(), any(), any(), any()))
+                .thenReturn(new CommissionService.CalculationResult(List.of(), List.of()));
+        when(commissionService.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(trxTransactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.save(any(MstUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        CompleteTransactionResponse result = transactionService.completeTransaction(sellerId, trxId);
+
+        // Assert — seller status flipped to ACTIVE
+        ArgumentCaptor<MstUser> userCaptor = ArgumentCaptor.forClass(MstUser.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertEquals("ACTIVE", userCaptor.getValue().getUserStatus());
+
+        // Assert — USER_ACTIVATED audit log was written exactly once
+        verify(auditService, times(1)).saveLog(
+                eq(sellerId),
+                eq(AuditAction.USER_ACTIVATED),
+                eq(EntityType.USER),
+                eq(sellerId),
+                argThat(msg -> msg.contains("User activated on first completed transaction") && msg.contains(trxId.toString())),
+                eq(AuditOutcome.SUCCESS.name()),
+                isNull(),
+                isNull()
+        );
+
+        // Assert — TRANSACTION_COMPLETE audit log was ALSO written (existing behavior, regression guard)
+        verify(auditService, times(1)).saveLog(
+                eq(sellerId),
+                eq(AuditAction.TRANSACTION_COMPLETE),
+                eq(EntityType.TRANSACTION),
+                eq(trxId),
+                anyString(),
+                eq(AuditOutcome.SUCCESS.name()),
+                isNull(),
+                isNull()
+        );
+
+        assertNotNull(result);
+        assertEquals("COMPLETED", result.getTrxStatus());
     }
 
     @Test

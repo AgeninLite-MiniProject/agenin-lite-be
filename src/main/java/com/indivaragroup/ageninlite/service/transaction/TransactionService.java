@@ -138,6 +138,15 @@ public class TransactionService {
             log.info("seller activated on first completion sellerId={} trxId={}", seller.getUserId(), trxId);
             seller.setUserStatus(UserStatus.ACTIVE.name());
             userRepository.save(seller);
+            auditService.saveLog(
+                    requesterId,
+                    AuditAction.USER_ACTIVATED,
+                    EntityType.USER,
+                    seller.getUserId(),
+                    "User activated on first completed transaction " + savedTrx.getTrxId(),
+                    AuditOutcome.SUCCESS.name(),
+                    null, null
+            );
         }
 
         auditService.saveLog(requesterId, AuditAction.TRANSACTION_COMPLETE, EntityType.TRANSACTION, savedTrx.getTrxId(), "Transaction completed", AuditOutcome.SUCCESS.name(), null, null);
