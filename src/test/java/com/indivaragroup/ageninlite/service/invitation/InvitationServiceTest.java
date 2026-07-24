@@ -1,5 +1,8 @@
 package com.indivaragroup.ageninlite.service.invitation;
 
+import com.indivaragroup.ageninlite.common.enums.AuditAction;
+import com.indivaragroup.ageninlite.common.enums.AuditOutcome;
+import com.indivaragroup.ageninlite.common.enums.EntityType;
 import com.indivaragroup.ageninlite.common.exception.AppException;
 import com.indivaragroup.ageninlite.common.exception.code.InvitationErrorCode;
 import com.indivaragroup.ageninlite.dto.invitation.AcceptInvitationResponse;
@@ -324,6 +327,9 @@ class InvitationServiceTest {
         assertEquals(inviterId, result.getReferredBy());
         assertNotNull(result.getRespondedAt());
         assertEquals(inviterId, invitee.getReferredBy());
+        verify(auditService, never()).saveLog(
+                any(), eq(AuditAction.INVITATION_EXPIRED), any(), any(), any(), any(), any(), any()
+        );
     }
 
     @Test
@@ -342,6 +348,29 @@ class InvitationServiceTest {
         verify(invitationRepository, times(2)).save(captor.capture());
         List<TrxInvitation> savedInvs = captor.getAllValues();
         assertEquals("EXPIRED", savedInvs.get(1).getInvitationStatus());
+
+        verify(auditService, times(1)).saveLog(
+                eq(inviteeId),
+                eq(AuditAction.INVITATION_EXPIRED),
+                eq(EntityType.INVITATION),
+                eq(otherPendingInvitation.getInvitationId()),
+                argThat(msg -> msg.contains("competing acceptance") && msg.contains(inviterId.toString())),
+                eq(AuditOutcome.SUCCESS.name()),
+                isNull(),
+                isNull()
+        );
+
+// The winning invitation was accepted → INVITE_ACCEPTED audit row was also written (regression guard)
+        verify(auditService, times(1)).saveLog(
+                eq(inviteeId),
+                eq(AuditAction.INVITE_ACCEPTED),
+                eq(EntityType.INVITATION),
+                any(),
+                anyString(),
+                eq(AuditOutcome.SUCCESS.name()),
+                isNull(),
+                isNull()
+        );
     }
 
     @Test
@@ -437,6 +466,16 @@ class InvitationServiceTest {
         verify(invitationRepository).save(captor.capture());
         assertEquals("EXPIRED", captor.getValue().getInvitationStatus());
         verify(userRepository, never()).save(any(MstUser.class));
+        verify(auditService, times(1)).saveLog(
+                eq(inviteeId),
+                eq(AuditAction.INVITATION_EXPIRED),
+                eq(EntityType.INVITATION),
+                any(),
+                argThat(msg -> msg.contains("downliner cap") && msg.contains(inviterId.toString())),
+                eq(AuditOutcome.SUCCESS.name()),
+                isNull(),
+                isNull()
+        );
     }
 
     // ==================== Group 3: decline() ====================
