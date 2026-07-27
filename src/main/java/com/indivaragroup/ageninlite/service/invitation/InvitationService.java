@@ -123,11 +123,19 @@ public class InvitationService {
                     AuditAction.INVITATION_EXPIRED,
                     EntityType.INVITATION,
                     invitation.getInvitationId(),
-                    "Invitation auto-expired (inviter " + inviterId + " at downliner cap",
+                    "Invitation auto-expired (inviter " + inviterId + " at downliner cap)",
                     AuditOutcome.SUCCESS.name(),
                     null, null
             );
-            throw new AppException(InvitationErrorCode.INV_0010);
+            return AcceptInvitationResponse.builder()
+                    .inviterId(inviterId)
+                    .inviteeId(inviteeId)
+                    .status(InvitationStatus.EXPIRED.name())
+                    .respondedAt(invitation.getRespondedAt())
+                    .referredBy(null)
+                    .cancelledCount(0)
+                    .message("Invitation expired: inviter has reached the downliner limit")
+                    .build();
         }
 
         invitee.setReferredBy(inviterId);
