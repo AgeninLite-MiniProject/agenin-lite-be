@@ -454,14 +454,17 @@ class InvitationServiceTest {
     }
 
     @Test
-    void accept_Invitation_WhenInviterAt10Downliners_ShouldExpireAndThrowInv0010() {
+    void accept_Invitation_WhenInviterAt10Downliners_ShouldExpireWithoutAccepting() {
         when(invitationRepository.findByInviterIdAndInviteeId(inviterId, inviteeId)).thenReturn(Optional.of(buildInvitation("PENDING")));
         when(userRepository.findById(inviteeId)).thenReturn(Optional.of(invitee));
         when(userRepository.countByReferredBy(inviterId)).thenReturn(10);
         when(invitationRepository.save(any(TrxInvitation.class))).thenAnswer(i -> i.getArguments()[0]);
 
-        AppException ex = assertThrows(AppException.class, () -> invitationService.acceptInvitation(inviterId, inviteeId));
-        assertEquals(InvitationErrorCode.INV_0010, ex.getErrorCode());
+        AcceptInvitationResponse result = invitationService.acceptInvitation(inviterId, inviteeId);
+
+        assertEquals("EXPIRED", result.getStatus());
+        assertNull(result.getReferredBy());
+        assertEquals(0, result.getCancelledCount());
         ArgumentCaptor<TrxInvitation> captor = ArgumentCaptor.forClass(TrxInvitation.class);
         verify(invitationRepository).save(captor.capture());
         assertEquals("EXPIRED", captor.getValue().getInvitationStatus());
@@ -477,7 +480,6 @@ class InvitationServiceTest {
                 isNull()
         );
     }
-
     // ==================== Group 3: decline() ====================
 
     @Test
