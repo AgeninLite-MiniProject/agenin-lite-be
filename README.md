@@ -33,6 +33,23 @@ AgeninLite Backend is the core RESTful API service built for the AgeninLite agen
 
 ---
 
+## OpenAPI Specification & Swagger UI
+
+The backend provides interactive API documentation generated automatically via Springdoc OpenAPI 3.
+
+### Accessing Swagger UI
+When the application is running locally, access Swagger UI in your browser:
+- **Interactive UI**: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+- **OpenAPI JSON Spec**: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
+
+### Testing Protected Endpoints in Swagger UI
+1. Generate an authentication token via `/api/auth/login` or test utilities.
+2. Click the **Authorize** button at the top right of the Swagger UI page.
+3. Enter your token in the Value field: `Bearer <your_token>`.
+4. Click **Authorize** to enable authenticated API testing across protected endpoints.
+
+---
+
 ## Project Structure (Layer-First)
 
 The codebase strictly adheres to a **Layer-First Architecture**:
